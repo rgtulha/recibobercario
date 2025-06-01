@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerenciador de Recibos</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #FDFBF8;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 250px;
+            max-height: 300px;
+        }
+        @media print {
+            .no-print {
+                display: none;
+            }
+            main {
+                display: block;
+                padding: 0;
+            }
+            #receipt-section {
+                margin: 0;
+                padding: 0;
+                border: none;
+                box-shadow: none;
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body class="text-stone-700">
+
+    <main class="flex flex-col md:flex-row w-full min-h-screen">
+        
+        <aside class="w-full md:w-1/3 lg:w-1/4 p-6 bg-white border-r border-stone-200 no-print">
+            <h1 class="text-2xl font-bold text-stone-800 mb-1">Funcionárias</h1>
+            <p class="text-sm text-stone-500 mb-4">Selecione uma funcionária para gerar o recibo.</p>
+            <div class="mb-4">
+                <input type="text" id="searchInput" placeholder="🔎 Pesquisar por nome..." class="w-full px-4 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500">
+            </div>
+            <div id="employeeList" class="overflow-y-auto" style="height: calc(100vh - 150px);">
+            </div>
+        </aside>
+
+        <section id="receipt-section" class="w-full md:w-2/3 lg:w-3/4 p-6 md:p-10 bg-stone-50/50">
+            <div id="welcome-message" class="flex flex-col items-center justify-center h-full text-center">
+                 <div class="p-8 bg-white rounded-xl shadow-sm border border-stone-200">
+                    <h2 class="text-3xl font-bold text-teal-700 mb-2">Gerador de Recibos</h2>
+                    <p class="text-stone-600 max-w-md">Bem-vindo(a) à aplicação de gerenciamento de recibos. Para começar, por favor, selecione uma funcionária da lista à esquerda. O recibo correspondente será gerado e exibido aqui.</p>
+                </div>
+            </div>
+
+            <div id="receipt-content" class="hidden">
+                <div class="flex justify-between items-start mb-8">
+                    <h2 class="text-4xl font-bold text-stone-800">Recibo de Pagamento</h2>
+                    <button onclick="window.print()" class="no-print px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-printer-fill" viewBox="0 0 16 16">
+                            <path d="M5 1a2 2 0 0 0-2 2v1h10V3a2 2 0 0 0-2-2H5zm5 8H6a1 1 0 0 0-1 1v3a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1v-3a1 1 0 0 0-1-1z"/>
+                            <path d="M0 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-1v-2a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v2H2a2 2 0 0 1-2-2V7zm2.5 1a.5.5 0 1 0 0-1 .5.5 0 0 0 0 1z"/>
+                        </svg>
+                        Imprimir
+                    </button>
+                </div>
+
+                <div class="bg-white p-8 rounded-xl shadow-lg border border-stone-200">
+                    <div class="grid grid-cols-2 gap-x-8 gap-y-4 mb-8 pb-4 border-b-2 border-dashed">
+                        <div>
+                            <p class="text-sm text-stone-500">Nº do Recibo</p>
+                            <p id="receipt-id" class="text-lg font-semibold text-stone-800">100</p>
+                        </div>
+                        <div class="text-right">
+                             <p class="text-sm text-stone-500">VALOR TOTAL</p>
+                            <p id="receipt-total" class="text-3xl font-bold text-teal-600">R$ 180,60</p>
+                        </div>
+                    </div>
+
+                    <div class="mb-6">
+                        <p class="text-sm text-stone-500 mb-1">Recebido de</p>
+                        <p id="receipt-payer" class="text-lg text-stone-800">BERÇÁRIO E ESCOLA CRESCER FELIZ LTDA</p>
+                    </div>
+
+                    <div class="mb-6">
+                        <p class="text-sm text-stone-500 mb-1">Nome do(a) Beneficiário(a)</p>
+                        <p id="employee-name" class="text-lg font-semibold text-stone-800"></p>
+                    </div>
+
+                    <div class="mb-8">
+                        <p class="text-sm text-stone-500 mb-1">CPF do(a) Beneficiário(a)</p>
+                        <p id="employee-cpf" class="text-lg text-stone-800"></p>
+                    </div>
+                    
+                    <div class="bg-stone-50 p-6 rounded-lg border border-stone-200">
+                        <p class="text-sm text-stone-500 mb-2">Correspondente a:</p>
+                        <p id="receipt-description" class="text-base text-stone-700 mb-4">REFERENTE AO VALE TRANSPORTE</p>
+                        
+                        <div class="text-sm text-stone-600 space-y-1">
+                           <p id="receipt-period"><strong>Período:</strong> 21 dias úteis do Mês de Maio/2025 (01/05/25 a 31/05/25)</p>
+                           <p id="receipt-daily-value"><strong>Valor Diário:</strong> R$ 8,60</p>
+                        </div>
+                        
+                        <p class="text-lg text-stone-800 font-semibold mt-4 pt-4 border-t border-stone-200">
+                            Quantia por extenso: <span id="receipt-total-words" class="font-normal">Cento e Oitenta Reais e Sessenta Centavos</span>
+                        </p>
+                    </div>
+                    
+                    <div class="mt-12 text-center">
+                        <p id="receipt-signature-line" class="border-b-2 border-stone-400 w-3/4 mx-auto pb-1"></p>
+                        <p id="employee-signature-name" class="pt-2 text-md font-semibold"></p>
+                        <p class="text-sm text-stone-500">Assinatura do(a) Beneficiário(a)</p>
+                    </div>
+
+                    <div class="mt-8 text-center text-sm text-stone-500">
+                        <p id="receipt-location-date">Goiânia, 09 de maio de 2025.</p>
+                    </div>
+                </div>
+
+                <div class="mt-10 pt-6 border-t border-stone-200">
+                    <h3 class="text-xl font-bold text-stone-800 mb-4 text-center">Análise Comparativa de Pagamento</h3>
+                     <p class="text-center text-stone-600 mb-6 max-w-2xl mx-auto">Este gráfico compara o valor do vale transporte da funcionária selecionada com a média de pagamentos. Esta é uma visualização para fins de demonstração, ajudando a contextualizar os dados de forma rápida e visual.</p>
+                    <div class="chart-container">
+                        <canvas id="paymentChart"></canvas>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+    </main>
+
+    <script>
+        const employeeData = [
+            { nome: "ADRIANA GONÇALVES PEREIRA", cpf: "958.678.721-49" },
+            { nome: "ADRIANA PEREIRA DA COSTA", cpf: "039.288.382-10" },
+            { nome: "ALESSANDRA FERREIRA LEITE", cpf: "880.262.641-34" },
+            { nome: "CAROLYNE FERREIRA ANDRADE", cpf: "035.257.371-65" },
+            { nome: "DEUZANIR ALVES PEREIRA COSTA", cpf: "014.949.831-41" },
+            { nome: "ELLEN PEREIRA DA SILVA", cpf: "054.538.731-08" },
+            { nome: "KAROLINE PEREIRA DE ALMEIDA", cpf: "554.958.852-87" },
+            { nome: "LEILIANE DO PRADO OLIVEIRA", cpf: "013.560.943-76" },
+            { nome: "LUZIA RODRIGUES DE SOUZA", cpf: "702.946.181-98" },
+            { nome: "MAIRA APARECIDA DE JESUS SANTOS", cpf: "014.943.541-01" },
+            { nome: "MARIA DOMINGAS ARAÚJO DA SILVA", cpf: "052.764.961-96" },
+            { nome: "MARILEIA LOPES DOS SANTOS MENDES", cpf: "011.786.881-78" },
+            { nome: "RAQUEL DE SOUZA PEREIRA GOMES", cpf: "049.108.801-94" },
+            { nome: "ROSENIR MARIA PEREIRA", cpf: "952.935.581-53" },
+            { nome: "ROSIRENE GONÇALVES PIRES", cpf: "921.326.186-15" },
+            { nome: "VERA LUCIA DE LEMOS PEREIRA DA CRUZ", cpf: "018.455.171-48" },
+            { nome: "WATINA LORRAINE MARTINS", cpf: "058.233.501-98" }
+        ];
+
+        const receiptDetails = {
+            id: "100",
+            total: 180.60,
+            payer: "BERÇÁRIO E ESCOLA CRESCER FELIZ LTDA",
+            description: "REFERENTE AO VALE TRANSPORTE",
+            period: "21 dias úteis do Mês de Maio/2025 (01/05/25 a 31/05/25)",
+            dailyValue: 8.60,
+            totalWords: "Cento e Oitenta Reais e Sessenta Centavos",
+            locationDate: "Goiânia, 09 de maio de 2025"
+        };
+        
+        const employeeListEl = document.getElementById('employeeList');
+        const searchInputEl = document.getElementById('searchInput');
+        const welcomeMessageEl = document.getElementById('welcome-message');
+        const receiptContentEl = document.getElementById('receipt-content');
+        
+        let paymentChart = null;
+
+        function formatCurrency(value) {
+            return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        }
+
+        function renderEmployeeList(filter = '') {
+            employeeListEl.innerHTML = '';
+            const filteredData = employeeData.filter(emp => emp.nome.toLowerCase().includes(filter.toLowerCase()));
+            
+            if (filteredData.length === 0) {
+                employeeListEl.innerHTML = `<p class="text-stone-500 p-4 text-center">Nenhuma funcionária encontrada.</p>`;
+                return;
+            }
+
+            filteredData.forEach(employee => {
+                const item = document.createElement('div');
+                item.className = 'p-3 mb-2 rounded-lg cursor-pointer hover:bg-teal-50 border-b border-stone-200';
+                item.textContent = employee.nome;
+                item.onclick = () => selectEmployee(employee);
+                employeeListEl.appendChild(item);
+            });
+        }
+
+        function selectEmployee(employee) {
+            welcomeMessageEl.classList.add('hidden');
+            receiptContentEl.classList.remove('hidden');
+            
+            document.getElementById('receipt-id').textContent = receiptDetails.id;
+            document.getElementById('receipt-total').textContent = formatCurrency(receiptDetails.total);
+            document.getElementById('receipt-payer').textContent = receiptDetails.payer;
+            document.getElementById('employee-name').textContent = employee.nome;
+            document.getElementById('employee-cpf').textContent = employee.cpf;
+            document.getElementById('receipt-description').textContent = receiptDetails.description;
+            document.getElementById('receipt-period').innerHTML = `<strong>Período:</strong> ${receiptDetails.period}`;
+            document.getElementById('receipt-daily-value').innerHTML = `<strong>Valor Diário:</strong> ${formatCurrency(receiptDetails.dailyValue)}`;
+            document.getElementById('receipt-total-words').textContent = receiptDetails.totalWords;
+            document.getElementById('employee-signature-name').textContent = employee.nome;
+            document.getElementById('receipt-location-date').textContent = receiptDetails.locationDate;
+            
+            updateChart(employee);
+        }
+
+        function updateChart(selectedEmployee) {
+            const ctx = document.getElementById('paymentChart').getContext('2d');
+            const averagePayment = 175.50;
+
+            const data = {
+                labels: [selectedEmployee.nome, 'Média Geral'],
+                datasets: [{
+                    label: 'Valor do Pagamento (R$)',
+                    data: [receiptDetails.total, averagePayment],
+                    backgroundColor: [
+                        'rgba(13, 148, 136, 0.6)',
+                        'rgba(120, 113, 108, 0.6)'
+                    ],
+                    borderColor: [
+                        'rgb(13, 148, 136)',
+                        'rgb(120, 113, 108)'
+                    ],
+                    borderWidth: 2
+                }]
+            };
+
+            const options = {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.dataset.label || '';
+                                if (label) {
+                                    label += ': ';
+                                }
+                                if (context.parsed.y !== null) {
+                                    label += formatCurrency(context.parsed.y);
+                                }
+                                return label;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value, index, ticks) {
+                                return 'R$ ' + value;
+                            }
+                        }
+                    }
+                }
+            };
+            
+            if (paymentChart) {
+                paymentChart.destroy();
+            }
+
+            paymentChart = new Chart(ctx, {
+                type: 'bar',
+                data: data,
+                options: options
+            });
+        }
+        
+        searchInputEl.addEventListener('keyup', (e) => {
+            renderEmployeeList(e.target.value);
+        });
+
+        window.onload = () => {
+            renderEmployeeList();
+        };
+
+    </script>
+</body>
+</html>
