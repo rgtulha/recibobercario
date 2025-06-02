@@ -188,6 +188,21 @@
                     Gerar Recibo
                 </button>
             </div>
+
+            <h2 class="text-lg font-semibold text-stone-700 mb-3 mt-6">Gerenciar Funcionárias</h2>
+            <div class="mb-4 p-4 bg-stone-50 rounded-lg border border-stone-200">
+                <h3 class="text-md font-semibold text-stone-700 mb-3">Adicionar Nova Funcionária</h3>
+                <div class="mb-3">
+                    <label for="newEmployeeName" class="block text-sm font-medium text-stone-700 mb-1">Nome:</label>
+                    <input type="text" id="newEmployeeName" placeholder="Nome completo" class="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500">
+                </div>
+                <div class="mb-3">
+                    <label for="newEmployeeCpf" class="block text-sm font-medium text-stone-700 mb-1">CPF:</label>
+                    <input type="text" id="newEmployeeCpf" placeholder="999.999.999-99" class="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500">
+                </div>
+                <button id="addEmployeeButton" class="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-md">Adicionar Funcionária</button>
+            </div>
+
         </aside>
 
         <section id="receipt-section" class="w-full md:w-2/3 lg:w-3/4 p-6 md:p-10 bg-stone-50/50 shadow-xl rounded-lg">
@@ -296,9 +311,20 @@
         </div>
     </div>
 
+    <div id="deleteConfirmationModal" class="fixed inset-0 z-50 flex items-center justify-center modal hidden no-print">
+        <div class="bg-white p-8 rounded-lg shadow-2xl max-w-sm w-full mx-4 border-t-4 border-red-600">
+            <h3 class="text-xl font-semibold text-red-700 mb-4">Confirmar Exclusão</h3>
+            <p class="text-stone-700 mb-6">Tem certeza que deseja excluir a funcionária <span id="deleteEmployeeName" class="font-bold"></span>?</p>
+            <div class="flex justify-end gap-4">
+                <button id="cancelDeleteButton" class="px-4 py-2 text-stone-700 bg-stone-200 rounded-lg hover:bg-stone-300 transition-colors shadow-sm">Cancelar</button>
+                <button id="confirmDeleteButton" class="px-4 py-2 text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors shadow-md">Excluir</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         // Dados das funcionárias
-        const employeeData = [
+        let employeeData = [ // Changed to 'let' to allow modification
             { nome: "ADRIANA GONÇALVES PEREIRA", cpf: "958.678.721-49" },
             { nome: "ADRIANA PEREIRA DA COSTA", cpf: "039.288.382-10" },
             { nome: "ALESSANDRA FERREIRA LEITE", cpf: "880.262.641-34" },
@@ -382,6 +408,17 @@
         const messageModalContentEl = document.getElementById('messageModalContent');
         const messageModalCloseButton = document.getElementById('messageModalCloseButton');
 
+        // Elementos para adicionar/remover funcionárias
+        const newEmployeeNameInput = document.getElementById('newEmployeeName');
+        const newEmployeeCpfInput = document.getElementById('newEmployeeCpf');
+        const addEmployeeButton = document.getElementById('addEmployeeButton');
+
+        // Elementos do novo modal de confirmação de exclusão
+        const deleteConfirmationModalEl = document.getElementById('deleteConfirmationModal');
+        const deleteEmployeeNameEl = document.getElementById('deleteEmployeeName');
+        const cancelDeleteButton = document.getElementById('cancelDeleteButton');
+        const confirmDeleteButton = document.getElementById('confirmDeleteButton');
+
         let paymentChart = null;
         let currentReceiptNumber = 99;
         let selectedEmployeeForReceipt = null; // Armazena a funcionária selecionada
@@ -393,6 +430,8 @@
         let currentCalendarMonth = new Date().getMonth();
         let currentCalendarYear = new Date().getFullYear();
         let currentMarkType = 'absence'; // Tipo de marcação padrão para o calendário
+        let employeeToDeleteCpf = null; // Armazena o CPF da funcionária a ser excluída temporariamente
+
 
         // Formata um valor numérico para a moeda brasileira (BRL)
         function formatCurrency(value) {
@@ -728,10 +767,21 @@
 
             filteredData.forEach(employee => {
                 const item = document.createElement('div');
-                item.className = 'p-3 mb-2 rounded-lg cursor-pointer hover:bg-teal-50 border-b border-stone-200 employee-item';
-                item.textContent = employee.nome;
+                item.className = 'p-3 mb-2 rounded-lg cursor-pointer hover:bg-teal-50 border-b border-stone-200 employee-item flex justify-between items-center';
+                item.innerHTML = `
+                    <span>${employee.nome}</span>
+                    <button class="text-red-500 hover:text-red-700 ml-2" data-cpf="${employee.cpf}" onclick="showDeleteConfirmationModal('${employee.cpf}', '${employee.nome}')">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/>
+                        </svg>
+                    </button>
+                `;
                 item.dataset.cpf = employee.cpf; // Armazena o CPF para fácil acesso
-                item.onclick = () => selectEmployee(employee, item); // Atualiza para uma função de seleção
+                item.onclick = (event) => { // Modified to prevent button click from selecting employee
+                    if (!event.target.closest('button')) {
+                        selectEmployee(employee, item);
+                    }
+                };
                 employeeListEl.appendChild(item);
             });
             // Adiciona a classe 'selected' se a funcionária já estiver selecionada
@@ -778,6 +828,61 @@
             welcomeMessageEl.classList.remove('hidden');
             // --- FIM DO NOVO ---
         }
+
+        // Função para adicionar uma nova funcionária
+        function addEmployee() {
+            const name = newEmployeeNameInput.value.trim();
+            const cpf = newEmployeeCpfInput.value.trim();
+
+            if (!name || !cpf) {
+                showMessageModal("Erro de Entrada", "Por favor, preencha o nome e o CPF da nova funcionária.");
+                return;
+            }
+
+            // Basic CPF format validation (optional, can be more robust)
+            const cpfRegex = /^\d{3}\.\d{3}\.\d{3}-\d{2}$/;
+            if (!cpfRegex.test(cpf)) {
+                showMessageModal("Erro de CPF", "Por favor, insira um CPF válido no formato XXX.XXX.XXX-XX.");
+                return;
+            }
+
+            // Check if CPF already exists
+            if (employeeData.some(emp => emp.cpf === cpf)) {
+                showMessageModal("Erro de CPF", "Já existe uma funcionária com este CPF.");
+                return;
+            }
+
+            employeeData.push({ nome: name, cpf: cpf });
+            renderEmployeeList();
+            newEmployeeNameInput.value = '';
+            newEmployeeCpfInput.value = '';
+            showMessageModal("Sucesso", `Funcionária "${name}" adicionada com sucesso!`);
+        }
+
+        // Função para remover uma funcionária (agora chamada após confirmação)
+        function performRemoveEmployee() {
+            if (!employeeToDeleteCpf) return; // Should not happen if called correctly
+
+            const initialLength = employeeData.length;
+            employeeData = employeeData.filter(emp => emp.cpf !== employeeToDeleteCpf);
+            
+            if (employeeData.length < initialLength) {
+                renderEmployeeList();
+                // If the removed employee was the selected one, clear selection
+                if (selectedEmployeeForReceipt && selectedEmployeeForReceipt.cpf === employeeToDeleteCpf) {
+                    selectedEmployeeForReceipt = null;
+                    receiptContentEl.classList.add('hidden');
+                    welcomeMessageEl.classList.remove('hidden');
+                }
+                showMessageModal("Sucesso", `Funcionária removida com sucesso!`);
+            } else {
+                showMessageModal("Erro", "Funcionária não encontrada.");
+            }
+            employeeToDeleteCpf = null; // Clear the temporary storage
+        }
+
+        // Listener para o botão de adicionar funcionária
+        addEmployeeButton.addEventListener('click', addEmployee);
 
 
         // Exibe o modal de confirmação antes de gerar o recibo
@@ -845,6 +950,25 @@
         }
 
         messageModalCloseButton.addEventListener('click', hideMessageModal);
+
+        // Funções para o novo modal de confirmação de exclusão
+        function showDeleteConfirmationModal(cpf, name) {
+            employeeToDeleteCpf = cpf;
+            deleteEmployeeNameEl.textContent = name;
+            deleteConfirmationModalEl.classList.remove('hidden');
+        }
+
+        function hideDeleteConfirmationModal() {
+            deleteConfirmationModalEl.classList.add('hidden');
+            employeeToDeleteCpf = null; // Clear temporary storage
+        }
+
+        confirmDeleteButton.addEventListener('click', () => {
+            performRemoveEmployee();
+            hideDeleteConfirmationModal();
+        });
+
+        cancelDeleteButton.addEventListener('click', hideDeleteConfirmationModal);
 
 
         // Gera o recibo com base na funcionária selecionada e nos dias úteis calculados
