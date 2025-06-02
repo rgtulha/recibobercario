@@ -198,7 +198,7 @@
                 </div>
                 <div class="mb-3">
                     <label for="newEmployeeCpf" class="block text-sm font-medium text-stone-700 mb-1">CPF:</label>
-                    <input type="text" id="newEmployeeCpf" placeholder="999.999.999-99" class="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500">
+                    <input type="text" id="newEmployeeCpf" placeholder="999.999.999-99" maxlength="14" class="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500">
                 </div>
                 <button id="addEmployeeButton" class="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-md">Adicionar Funcionária</button>
             </div>
@@ -755,6 +755,11 @@
             radio.addEventListener('change', handleReceiptTypeChange);
         });
 
+        // Função auxiliar para capitalizar a primeira letra de cada palavra
+        function capitalizeWords(str) {
+            return str.replace(/\b\w/g, char => char.toUpperCase());
+        }
+
         // Renderiza a lista de funcionárias com base em um filtro de pesquisa
         function renderEmployeeList(filter = '') {
             employeeListEl.innerHTML = '';
@@ -829,6 +834,30 @@
             // --- FIM DO NOVO ---
         }
 
+        // Função para formatar o CPF
+        function formatCpfInput(event) {
+            let value = event.target.value.replace(/\D/g, ''); // Remove tudo que não for dígito
+            let formattedValue = '';
+
+            if (value.length > 0) {
+                formattedValue += value.substring(0, 3);
+                if (value.length > 3) {
+                    formattedValue += '.' + value.substring(3, 6);
+                }
+                if (value.length > 6) {
+                    formattedValue += '.' + value.substring(6, 9);
+                }
+                if (value.length > 9) {
+                    formattedValue += '-' + value.substring(9, 11);
+                }
+            }
+            event.target.value = formattedValue;
+        }
+
+        // Adicionar o listener para o campo de CPF
+        newEmployeeCpfInput.addEventListener('input', formatCpfInput);
+
+
         // Função para adicionar uma nova funcionária
         function addEmployee() {
             const name = newEmployeeNameInput.value.trim();
@@ -851,12 +880,14 @@
                 showMessageModal("Erro de CPF", "Já existe uma funcionária com este CPF.");
                 return;
             }
+            
+            const capitalizedName = capitalizeWords(name); // Capitaliza o nome
 
-            employeeData.push({ nome: name, cpf: cpf });
+            employeeData.push({ nome: capitalizedName, cpf: cpf });
             renderEmployeeList();
             newEmployeeNameInput.value = '';
             newEmployeeCpfInput.value = '';
-            showMessageModal("Sucesso", `Funcionária "${name}" adicionada com sucesso!`);
+            showMessageModal("Sucesso", `Funcionária "${capitalizedName}" adicionada com sucesso!`);
         }
 
         // Função para remover uma funcionária (agora chamada após confirmação)
