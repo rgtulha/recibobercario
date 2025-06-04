@@ -498,6 +498,7 @@
 
         /**
          * Converts a number to its Portuguese word representation for monetary values.
+         * Handles numbers up to thousands.
          * @param {number} num - The number to convert.
          * @returns {string} The number in words.
          */
@@ -511,16 +512,27 @@
             let reaisNum = parseInt(reaisStr);
             let centavosNum = parseInt(centavosStr);
 
-            const unidades = ["", "Um", "Dois", "Três", "Quatro", "Cinco", "Seis", "Sete", "Oito", "Nove"];
-            const especiais = ["Dez", "Onze", "Doze", "Treze", "Catorze", "Quinze", "Dezesseis", "Dezessete", "Dezoito", "Dezenove"];
-            const dezenas = ["", "", "Vinte", "Trinta", "Quarenta", "Cinquenta", "Sessenta", "Setenta", "Oitenta", "Noventa"];
-            const centenas = ["", "Cento", "Duzentos", "Trezentos", "Quatrocentos", "Quinhentos", "Seiscentos", "Setecentos", "Oitocentos", "Novecentos"];
+            const unidades = ["", "um", "dois", "três", "quatro", "cinco", "seis", "sete", "oito", "nove"];
+            const especiais = ["dez", "onze", "doze", "treze", "catorze", "quinze", "dezesseis", "dezessete", "dezoito", "dezenove"];
+            const dezenas = ["", "", "vinte", "trinta", "quarenta", "cinquenta", "sessenta", "setenta", "oitenta", "noventa"];
+            const centenas = ["", "cento", "duzentos", "trezentos", "quatrocentos", "quinhentos", "seiscentos", "setecentos", "oitocentos", "novecentos"];
 
             function getWordsPart(n) {
                 if (n === 0) return "";
                 let str = "";
+
+                if (n >= 1000) {
+                    if (n === 1000) {
+                        str += "mil";
+                    } else {
+                        str += getWordsPart(Math.floor(n / 1000)) + " mil";
+                    }
+                    n %= 1000;
+                    if (n > 0) str += " e "; // Add "e" if there are remaining hundreds/tens/units
+                }
+
                 if (n >= 100) {
-                    if (n === 100) str += "Cem";
+                    if (n === 100) str += "cem";
                     else str += centenas[Math.floor(n / 100)];
                     n %= 100;
                     if (n > 0) str += " e ";
@@ -540,16 +552,23 @@
             }
 
             let reaisText = getWordsPart(reaisNum);
-            if (reaisNum === 0) reaisText = "Zero";
-            reaisText += reaisNum === 1 ? " Real" : " Reais";
+            if (reaisNum === 0) reaisText = "zero"; // Changed to "zero" for consistency
+            reaisText += reaisNum === 1 ? " real" : " reais"; // Changed to lowercase for consistency
 
             let centavosText = "";
             if (centavosNum > 0) {
                 centavosText = getWordsPart(centavosNum);
-                centavosText += centavosNum === 1 ? " Centavo" : " Centavos";
+                centavosText += centavosNum === 1 ? " centavo" : " centavos";
             }
             
-            return reaisText + (centavosNum > 0 ? " e " + centavosText : "");
+            // Combine reais and centavos
+            if (centavosNum > 0 && reaisNum > 0) {
+                return `${reaisText} e ${centavosText}`;
+            } else if (centavosNum > 0) {
+                return centavosText;
+            } else {
+                return reaisText;
+            }
         }
 
         /**
