@@ -376,6 +376,7 @@
             description: "REFERENTE AO VALE TRANSPORTE",
             dailyValue: 8.60, // Valor diário do vale transporte
             fixedBonusAmount: 200.00, // Valor fixo da bonificação
+            monthlyAllowance: 1100.00, // Valor fixo mensal da bolsa de estágio
             location: "Goiânia"
         };
 
@@ -1103,7 +1104,7 @@
                 totalValue = effectiveDays * receiptBaseDetails.dailyValue;
                 receiptDescriptionText = "REFERENTE AO VALE TRANSPORTE";
             } else if (selectedReceiptType === 'salarioEstagiario') {
-                const monthlyAllowance = 1100;
+                const monthlyAllowance = receiptBaseDetails.monthlyAllowance;
                 const standardWorkingDaysPerMonth = 22; 
                 const dailyAllowance = monthlyAllowance / standardWorkingDaysPerMonth;
                 totalValue = monthlyAllowance - (absenceDaysCount * dailyAllowance); // Only subtract absences
@@ -1131,19 +1132,25 @@
             document.getElementById('employee-cpf').textContent = employee.cpf;
             document.getElementById('receipt-description').textContent = receiptDescriptionText;
             
-            const periodText = `<strong>Período:</strong> ${effectiveDays} dia(s) útil(eis) efetivo(s) de ${formatDate(startDateInput.value)} até ${formatDate(endDateInput.value)}.`;
+            // Get month name for period text
+            const startDateObj = new Date(startDateInput.value + 'T00:00:00');
+            const monthNames = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
+            const monthName = monthNames[startDateObj.getMonth()];
+
+            // Updated Period Text
+            const periodText = `<strong>Período:</strong> dias trabalhados do mês de ${monthName} (${formatDate(startDateInput.value)} até ${formatDate(endDateInput.value)}).`;
             document.getElementById('receipt-period-info').innerHTML = periodText;
             
+            let dailyValueHtml = '';
             if (selectedReceiptType === 'valeTransporte') {
-                document.getElementById('receipt-daily-value').innerHTML = `<strong>Valor Diário:</strong> ${formatCurrency(receiptBaseDetails.dailyValue)}`;
+                dailyValueHtml = `<strong>Valor Diário:</strong> ${formatCurrency(receiptBaseDetails.dailyValue)} (${numberToWords(receiptBaseDetails.dailyValue)})`;
             } else if (selectedReceiptType === 'salarioEstagiario') {
-                document.getElementById('receipt-daily-value').innerHTML = ''; 
+                dailyValueHtml = `<strong>Valor Fixo Mensal:</strong> ${formatCurrency(receiptBaseDetails.monthlyAllowance)} (${numberToWords(receiptBaseDetails.monthlyAllowance)})`;
             } else if (selectedReceiptType === 'bonificacao') {
-                 document.getElementById('receipt-daily-value').innerHTML = `<strong>Valor Fixo Mensal:</strong> ${formatCurrency(receiptBaseDetails.fixedBonusAmount)}`;
+                dailyValueHtml = `<strong>Valor Fixo Mensal:</strong> ${formatCurrency(receiptBaseDetails.fixedBonusAmount)} (${numberToWords(receiptBaseDetails.fixedBonusAmount)})`;
             }
-            else {
-                document.getElementById('receipt-daily-value').innerHTML = ''; 
-            }
+            document.getElementById('receipt-daily-value').innerHTML = dailyValueHtml;
+            
 
             const holidaysInfoEl = document.getElementById('receipt-holidays-info');
             let additionalInfo = '';
