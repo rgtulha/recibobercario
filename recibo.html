@@ -1,1 +1,1267 @@
+ <!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerenciador de Recibos Simples</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #FDFBF8; /* Warm Neutral Background */
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 250px;
+            max-height: 300px;
+        }
+        .modal {
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+        /* Estilos para o calendário */
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 2px;
+            text-align: center;
+        }
+        .calendar-day {
+            padding: 6px 0;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: background-color 0.2s;
+        }
+        .calendar-day.header {
+            font-weight: 600;
+            background-color: #e0e7ff; /* Light blue for headers */
+            color: #4338ca; /* Darker blue for headers */
+        }
+        .calendar-day.current-month {
+            background-color: #f0f4f8; /* Light gray for current month days */
+            color: #4a5568; /* Darker gray for current month days */
+        }
+        .calendar-day.other-month {
+            background-color: #f8fafc; /* Lighter gray for other month days */
+            color: #a0aec0; /* Lighter gray for other month days */
+        }
+        .calendar-day.selected-absence {
+            background-color: #fca5a5; /* Red for absences */
+            color: #7f1d1d; /* Darker red for absences */
+            font-weight: 600;
+        }
+        .calendar-day.selected-certificate {
+            background-color: #a7f3d0; /* Green for certificates */
+            color: #065f46; /* Darker green for certificates */
+            font-weight: 600;
+        }
+        .calendar-day.holiday {
+            background-color: #fbd38d; /* Orange for holidays */
+            color: #92400e; /* Darker orange for holidays */
+            font-weight: 600;
+        }
+        .calendar-day.today {
+            border: 2px solid #3b82f6; /* Blue border for today */
+        }
+        .calendar-day:hover:not(.disabled-for-marking) {
+            background-color: #bfdbfe; /* Light blue on hover */
+        }
+        .calendar-day.disabled-for-marking {
+            cursor: not-allowed;
+            opacity: 0.6;
+            background-color: #e2e8f0; /* Lighter gray for disabled days */
+        }
+        .employee-item.selected {
+            background-color: #d1fae5; /* Light green for selected employee */
+            font-weight: 600;
+            border-color: #10b981;
+        }
+        @media print {
+            .no-print {
+                display: none !important; /* Ensure print button and sidebar are hidden */
+            }
+            main {
+                display: block;
+                padding: 0;
+                margin: 0;
+            }
+            aside {
+                display: none !important; /* Hide the sidebar completely */
+            }
+            #receipt-section {
+                margin: 0;
+                padding: 0;
+                border: none;
+                box-shadow: none;
+                width: 100%;
+                max-width: 100%;
+                /* Remove background color for cleaner print */
+                background-color: transparent !important; 
+            }
+            #receipt-content {
+                display: block !important; /* Ensure receipt content is visible */
+            }
+            #welcome-message {
+                display: none !important; /* Hide welcome message */
+            }
+            .chart-container {
+                display: none !important; /* Hide the chart */
+            }
+            .modal {
+                display: none !important; /* Hide all modals */
+            }
+            /* Adjust receipt content for better print layout */
+            #receipt-content > div { /* The main white box containing receipt details */
+                box-shadow: none !important;
+                border: none !important;
+                padding: 0 !important;
+            }
+        }
+    </style>
+</head>
+<body class="text-stone-700">
 
+    <main class="flex flex-col md:flex-row w-full min-h-screen">
+        
+        <aside class="w-full md:w-1/3 lg:w-1/4 p-6 bg-white border-r border-stone-200 no-print shadow-xl rounded-lg">
+            <h1 class="text-2xl font-bold text-stone-800 mb-1">Gerenciador de Recibos</h1>
+            <p class="text-sm text-stone-500 mb-4">Siga os passos para gerar o recibo.</p>
+            
+            <!-- Removed User ID Display - not needed for local storage -->
+
+            <h2 class="text-lg font-semibold text-stone-700 mb-3">1. Selecione a Funcionária</h2>
+            <div class="mt-2 mb-4">
+                <input type="text" id="searchInput" placeholder="🔎 Pesquisar funcionária..." class="w-full px-4 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500">
+            </div>
+            <div id="employeeList" class="overflow-y-auto mb-6" style="max-height: 200px;">
+            </div>
+
+            <h2 class="text-lg font-semibold text-stone-700 mb-3">2. Escolha o Tipo de Recibo</h2>
+            <div class="mb-6" id="receiptTypeSelection">
+                <div class="flex flex-wrap gap-3">
+                    <label class="inline-flex items-center">
+                        <input type="radio" name="receiptType" value="valeTransporte" class="form-radio text-teal-600" checked>
+                        <span class="ml-2 text-stone-700">Vale Transporte</span>
+                    </label>
+                    <label class="inline-flex items-center">
+                        <input type="radio" name="receiptType" value="salarioEstagiario" class="form-radio text-teal-600">
+                        <span class="ml-2 text-stone-700">Salário Estagiário</span>
+                    </label>
+                    <label class="inline-flex items-center">
+                        <input type="radio" name="receiptType" value="bonificacao" class="form-radio text-teal-600">
+                        <span class="ml-2 text-stone-700">Bonificação</span>
+                    </label>
+                </div>
+            </div>
+
+            <h2 class="text-lg font-semibold text-stone-700 mb-3">3. Defina o Período</h2>
+            <div class="mb-4">
+                <label for="startDate" class="block text-sm font-medium text-stone-700 mb-1">Data de Início:</label>
+                <input type="date" id="startDate" name="startDate" class="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500">
+            </div>
+            <div class="mb-4">
+                <label for="endDate" class="block text-sm font-medium text-stone-700 mb-1">Data de Fim:</label>
+                <input type="date" id="endDate" name="endDate" class="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500">
+            </div>
+             <div class="mb-4">
+                <button id="calculateDaysButton" class="w-full px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors shadow-md">Calcular Dias Úteis</button>
+            </div>
+            <p class="text-sm text-stone-600 mb-4">Dias Úteis Calculados: <span id="workingDaysInfo" class="font-semibold">0</span></p>
+            <p class="text-xs text-stone-500 mb-4">Feriados no Período: <span id="holidaysInPeriod" class="font-semibold text-red-500">Nenhum</span></p>
+
+            <div id="internPeriodContainer" class="mb-4 hidden">
+                <label for="internPeriod" class="block text-sm font-medium text-stone-700 mb-1">Período do Estagiário:</label>
+                <select id="internPeriod" name="internPeriod" class="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500">
+                    <option value="matutino">Matutino</option>
+                    <option value="vespertino">Vespertino</option>
+                </select>
+            </div>
+
+            <h2 class="text-lg font-semibold text-stone-700 mb-3">4. Marque Faltas/Atestados</h2>
+            <div class="mb-4 p-4 bg-stone-50 rounded-lg border border-stone-200">
+                <div class="flex justify-between items-center mb-3">
+                    <button id="prevMonth" class="px-3 py-1 bg-teal-500 text-white rounded-lg hover:bg-teal-600 transition-colors shadow-sm">&lt;</button>
+                    <span id="currentMonthYear" class="font-semibold text-stone-800"></span>
+                    <button id="nextMonth" class="px-3 py-1 bg-teal-500 text-white rounded-lg hover:bg-teal-600 transition-colors shadow-sm">&gt;</button>
+                </div>
+                <div id="calendar" class="calendar-grid">
+                </div>
+                <div class="flex flex-wrap gap-3 mt-4">
+                    <label class="inline-flex items-center">
+                        <input type="radio" name="markType" value="absence" class="form-radio text-red-500" checked>
+                        <span class="ml-2 text-stone-700">Marcar Falta</span>
+                    </label>
+                    <label class="inline-flex items-center">
+                        <input type="radio" name="markType" value="certificate" class="form-radio text-green-500">
+                        <span class="ml-2 text-stone-700">Marcar Atestado</span>
+                    </label>
+                </div>
+                <button id="clearMarkingButton" class="mt-4 w-full px-4 py-2 bg-stone-400 text-white rounded-lg hover:bg-stone-500 transition-colors shadow-md">Limpar Atestados e Faltas</button>
+            </div>
+
+            <div class="mt-6">
+                <button id="generateReceiptButton" class="w-full px-4 py-3 bg-teal-600 text-white font-bold rounded-lg hover:bg-teal-700 transition-colors shadow-lg">
+                    Gerar Recibo
+                </button>
+            </div>
+
+            <h2 class="text-lg font-semibold text-stone-700 mb-3 mt-6">Gerenciar Funcionárias</h2>
+            <div class="mb-4 p-4 bg-stone-50 rounded-lg border border-stone-200">
+                <h3 class="text-md font-semibold text-stone-700 mb-3">Adicionar Nova Funcionária</h3>
+                <div class="mb-3">
+                    <label for="newEmployeeName" class="block text-sm font-medium text-stone-700 mb-1">Nome:</label>
+                    <input type="text" id="newEmployeeName" placeholder="Nome completo" class="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500">
+                </div>
+                <div class="mb-3">
+                    <label for="newEmployeeCpf" class="block text-sm font-medium text-stone-700 mb-1">CPF:</label>
+                    <input type="text" id="newEmployeeCpf" placeholder="999.999.999-99" maxlength="14" class="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500">
+                </div>
+                <button id="addEmployeeButton" class="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-md">Adicionar Funcionária</button>
+            </div>
+
+        </aside>
+
+        <section id="receipt-section" class="w-full md:w-2/3 lg:w-3/4 p-6 md:p-10 bg-stone-50/50 shadow-xl rounded-lg">
+            <div id="welcome-message" class="flex flex-col items-center justify-center h-full text-center">
+                   <div class="p-8 bg-white rounded-xl shadow-sm border border-stone-200">
+                    <h2 class="text-3xl font-bold text-teal-700 mb-2">Gerador de Recibos</h2>
+                    <p class="text-stone-600 max-w-md">Bem-vindo(a)! Selecione uma funcionária, o tipo de recibo e o período para gerar o recibo.</p>
+                </div>
+            </div>
+
+            <div id="receipt-content" class="hidden">
+                <div class="flex justify-between items-start mb-8 no-print"> <!-- Added no-print class here -->
+                    <h2 id="receipt-title" class="text-4xl font-bold text-stone-800">Recibo</h2>
+                    <button onclick="window.print()" class="no-print px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors flex items-center gap-2 shadow-md">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M5 1a2 2 0 0 0-2 2v1h10V3a2 2 0 0 0-2-2H5zm5 8H6a1 1 0 0 0-1 1v3a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1v-3a1 1 0 0 0-1-1z"/>
+                            <path d="M0 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-1v-2a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v2H2a2 2 0 0 1-2-2V7zm2.5 1a.5.5 0 1 0 0-1 .5.5 0 0 0 0 1z"/>
+                        </svg>
+                        Imprimir
+                    </button>
+                </div>
+
+                <div class="bg-white p-8 rounded-xl shadow-lg border border-stone-200">
+                    <div class="grid grid-cols-2 gap-x-8 gap-y-4 mb-8 pb-4 border-b-2 border-dashed">
+                        <div>
+                            <p class="text-sm text-stone-500">Nº do Recibo</p>
+                            <p id="receipt-id" class="text-lg font-semibold text-stone-800"></p>
+                        </div>
+                        <div class="text-right">
+                             <p class="text-sm text-stone-500">VALOR TOTAL</p>
+                            <p id="receipt-total" class="text-3xl font-bold text-teal-600"></p>
+                        </div>
+                    </div>
+
+                    <div class="mb-6">
+                        <p class="text-sm text-stone-500 mb-1">Recebido de</p>
+                        <p id="receipt-payer" class="text-lg text-stone-800">BERÇÁRIO E ESCOLA CRESCER FELIZ LTDA</p>
+                        <p id="receipt-cnpj" class="text-sm text-stone-600">CNPJ: 32.741.557/0001-70</p>
+                    </div>
+
+                    <div class="mb-6">
+                        <p class="text-sm text-stone-500 mb-1">Nome do(a) Colaborador(a)</p>
+                        <p id="employee-name" class="text-lg font-semibold text-stone-800"></p>
+                    </div>
+
+                    <div class="mb-8">
+                        <p class="text-sm text-stone-500 mb-1">CPF do(a) Colaborador(a)</p>
+                        <p id="employee-cpf" class="text-lg text-stone-800"></p>
+                    </div>
+                    
+                    <div class="bg-stone-50 p-6 rounded-lg border border-stone-200">
+                        <p class="text-sm text-stone-500 mb-2">Correspondente a:</p>
+                        <p id="receipt-description" class="text-base text-stone-700 mb-4">REFERENTE AO VALE TRANSPORTE</p>
+                        
+                        <div class="text-sm text-stone-600 space-y-1">
+                            <p id="receipt-period-info"></p>
+                            <p id="receipt-daily-value"></p>
+                            <div id="receipt-holidays-info" class="text-red-600 text-xs mt-2"></div>
+                        </div>
+                        
+                        <p class="text-lg text-stone-800 font-semibold mt-4 pt-4 border-t border-stone-200">
+                            Quantia por extenso: <span id="receipt-total-words" class="font-normal"></span>
+                        </p>
+                    </div>
+                    
+                    <div class="mt-12 text-center">
+                        <p class="border-b-2 border-stone-400 w-3/4 mx-auto pb-1"></p>
+                        <p id="employee-signature-name" class="pt-2 text-md font-semibold"></p>
+                        <p class="text-sm text-stone-500">Assinatura do(a) Colaborador(a)</p>
+                    </div>
+
+                    <div class="mt-8 text-center text-sm text-stone-500">
+                        <p id="receipt-location-date">Goiânia, <span id="current-date-receipt"></span>.</p>
+                    </div>
+                </div>
+
+                <div class="mt-10 pt-6 border-t border-stone-200 no-print"> <!-- Added no-print class here -->
+                    <h3 class="text-xl font-bold text-stone-800 mb-4 text-center">Análise Comparativa de Pagamento</h3>
+                    <p class="text-center text-stone-600 mb-6 max-w-2xl mx-auto">Este gráfico compara o valor do vale transporte da funcionária selecionada com a média de pagamentos (valor fixo para demonstração).</p>
+                    <div class="chart-container">
+                        <canvas id="paymentChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Modals -->
+    <div id="confirmationModal" class="fixed inset-0 z-50 flex items-center justify-center modal hidden no-print">
+        <div class="bg-white p-8 rounded-lg shadow-2xl max-w-sm w-full mx-4">
+            <h3 class="text-xl font-semibold text-stone-800 mb-4">Confirmar Geração de Recibo</h3>
+            <p id="modalEmployeeName" class="text-stone-700 mb-6"></p>
+            <div class="flex justify-end gap-4">
+                <button id="cancelButton" class="px-4 py-2 text-stone-700 bg-stone-200 rounded-lg hover:bg-stone-300 transition-colors shadow-sm">Cancelar</button>
+                <button id="confirmButton" class="px-4 py-2 text-white bg-teal-600 rounded-lg hover:bg-teal-700 transition-colors shadow-md">Confirmar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="messageModal" class="fixed inset-0 z-50 flex items-center justify-center modal hidden no-print">
+        <div class="bg-white p-8 rounded-lg shadow-2xl max-w-sm w-full mx-4">
+            <h3 id="messageModalTitle" class="text-xl font-semibold text-stone-800 mb-4">Atenção!</h3>
+            <p id="messageModalContent" class="text-stone-700 mb-6"></p>
+            <div class="flex justify-end">
+                <button id="messageModalCloseButton" class="px-4 py-2 text-white bg-teal-600 rounded-lg hover:bg-teal-700 transition-colors shadow-md">Fechar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="deleteConfirmationModal" class="fixed inset-0 z-50 flex items-center justify-center modal hidden no-print">
+        <div class="bg-white p-8 rounded-lg shadow-2xl max-w-sm w-full mx-4 border-t-4 border-red-600">
+            <h3 class="text-xl font-semibold text-red-700 mb-4">Confirmar Exclusão</h3>
+            <p class="text-stone-700 mb-6">Tem certeza que deseja excluir a funcionária <span id="deleteEmployeeName" class="font-bold"></span>?</p>
+            <div class="flex justify-end gap-4">
+                <button id="cancelDeleteButton" class="px-4 py-2 text-stone-700 bg-stone-200 rounded-lg hover:bg-stone-300 transition-colors shadow-sm">Cancelar</button>
+                <button id="confirmDeleteButton" class="px-4 py-2 text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors shadow-md">Excluir</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Data for employees (now a local array)
+        let employeeData = [
+            { nome: "ADRIANA GONÇALVES PEREIRA", cpf: "958.678.721-49" },
+            { nome: "ADRIANA PEREIRA DA COSTA", cpf: "039.288.382-10" },
+            { nome: "ALESSANDRA FERREIRA LEITE", cpf: "880.262.641-34" },
+            { nome: "CAROLYNE FERREIRA ANDRADE", cpf: "035.257.371-65" },
+            { nome: "DEUZANIR ALVES PEREIRA COSTA", cpf: "014.949.831-41" },
+            { nome: "ELLEN PEREIRA DA SILVA", cpf: "054.538.731-08" },
+            { nome: "KAROLINE PEREIRA DE ALMEIDA", cpf: "554.958.852-87" },
+            { nome: "LEILIANE DO PRADO OLIVEIRA", cpf: "013.560.943-76" },
+            { nome: "LUZIA RODRIGUES DE SOUZA", cpf: "702.946.181-98" },
+            { nome: "MAIRA APARECIDA DE JESUS SANTOS", cpf: "014.943.541-01" },
+            { nome: "MARIA DOMINGAS ARAÚJO DA SILVA", cpf: "052.764.961-96" },
+            { nome: "MARILEIA LOPES DOS SANTOS MENDES", cpf: "011.786.881-78" },
+            { nome: "RAQUEL DE SOUZA PEREIRA GOMES", cpf: "049.108.801-94" },
+            { nome: "ROSENIR MARIA PEREIRA", cpf: "952.935.581-53" },
+            { nome: "ROSIRENE GONÇALVES PIRES", cpf: "921.326.186-15" },
+            { nome: "VERA LUCIA DE LEMOS PEREIRA DA CRUZ", cpf: "018.455.171-48" },
+            { nome: "WATINA LORRAINE MARTINS", cpf: "058.233.501-98" }
+        ];
+
+        // Detalhes base do recibo
+        const receiptBaseDetails = {
+            payer: "BERÇÁRIO E ESCOLA CRESCER FELIZ LTDA",
+            cnpj: "32.741.557/0001-70",
+            description: "REFERENTE AO VALE TRANSPORTE",
+            dailyValue: 8.60, // Valor diário do vale transporte
+            fixedBonusAmount: 200.00, // Valor fixo da bonificação
+            location: "Goiânia"
+        };
+
+        // Feriados de 2025
+        const holidays2025 = [ 
+            {date: "2025-01-01", name: "Confraternização Universal"},
+            {date: "2025-03-03", name: "Carnaval (Ponto Facultativo)"},
+            {date: "2025-03-04", name: "Carnaval (Ponto Facultativo)"},
+            {date: "2025-04-18", name: "Paixão de Cristo"},
+            {date: "2025-04-21", name: "Tiradentes"},
+            {date: "2025-05-01", name: "Dia do Trabalho"},
+            {date: "2025-06-19", name: "Corpus Christi (Ponto Facultativo)"},
+            {date: "2025-09-07", name: "Independência do Brasil"},
+            {date: "2025-10-12", name: "Nossa Senhora Aparecida"},
+            {date: "2025-10-24", name: "Aniversário de Goiânia"}, 
+            {date: "2025-11-02", name: "Finados"},
+            {date: "2025-11-15", name: "Proclamação da República"},
+            {date: "2025-11-20", name: "Consciência Negra"},
+            {date: "2025-12-25", name: "Natal"}
+        ];
+        
+        // Elementos do DOM
+        const employeeListEl = document.getElementById('employeeList');
+        const searchInputEl = document.getElementById('searchInput');
+        const welcomeMessageEl = document.getElementById('welcome-message');
+        const receiptContentEl = document.getElementById('receipt-content');
+        const startDateInput = document.getElementById('startDate');
+        const endDateInput = document.getElementById('endDate');
+        const workingDaysInfoEl = document.getElementById('workingDaysInfo');
+        const calculateDaysButtonEl = document.getElementById('calculateDaysButton');
+        const holidaysInPeriodEl = document.getElementById('holidaysInPeriod');
+        
+        const confirmationModalEl = document.getElementById('confirmationModal');
+        const modalEmployeeNameEl = document.getElementById('modalEmployeeName');
+        const confirmButtonEl = document.getElementById('confirmButton');
+        const cancelButtonEl = document.getElementById('cancelButton');
+
+        const receiptTypeSelectionEl = document.getElementById('receiptTypeSelection');
+        const internPeriodContainerEl = document.getElementById('internPeriodContainer');
+        const internPeriodSelectEl = document.getElementById('internPeriod');
+        const receiptTitleEl = document.getElementById('receipt-title');
+
+        // Elementos do calendário
+        const calendarEl = document.getElementById('calendar');
+        const currentMonthYearEl = document.getElementById('currentMonthYear');
+        const prevMonthBtn = document.getElementById('prevMonth');
+        const nextMonthBtn = document.getElementById('nextMonth');
+        const clearMarkingButton = document.getElementById('clearMarkingButton');
+        const generateReceiptButton = document.getElementById('generateReceiptButton');
+
+        // Elementos do novo modal de mensagem
+        const messageModalEl = document.getElementById('messageModal');
+        const messageModalTitleEl = document.getElementById('messageModalTitle');
+        const messageModalContentEl = document.getElementById('messageModalContent');
+        const messageModalCloseButton = document.getElementById('messageModalCloseButton');
+
+        // Elementos para adicionar/remover funcionárias
+        const newEmployeeNameInput = document.getElementById('newEmployeeName');
+        const newEmployeeCpfInput = document.getElementById('newEmployeeCpf');
+        const addEmployeeButton = document.getElementById('addEmployeeButton');
+        // Removed userIdDisplayEl as Firebase is no longer used
+
+        // Elementos do novo modal de confirmação de exclusão
+        const deleteConfirmationModalEl = document.getElementById('deleteConfirmationModal');
+        const deleteEmployeeNameEl = document.getElementById('deleteEmployeeName');
+        const cancelDeleteButton = document.getElementById('cancelDeleteButton');
+        const confirmDeleteButton = document.getElementById('confirmDeleteButton');
+
+        let paymentChart = null;
+        let currentReceiptNumber = 99; // This should ideally be stored persistently too
+        let selectedEmployeeForReceipt = null;
+        let calculatedWorkingDays = 0;
+        let holidaysFoundInPeriod = [];
+        let selectedAbsenceDates = new Set();
+        let selectedCertificateDates = new Set();
+        let selectedReceiptType = 'valeTransporte';
+        let currentCalendarMonth = new Date().getMonth();
+        let currentCalendarYear = new Date().getFullYear();
+        let currentMarkType = 'absence';
+        let employeeToDeleteCpf = null; // Changed to employeeToDeleteId to match the new employee object structure
+
+        /**
+         * Formats a numeric value to Brazilian currency (BRL).
+         * @param {number} value - The number to format.
+         * @returns {string} The formatted currency string.
+         */
+        function formatCurrency(value) {
+            return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        }
+        
+        /**
+         * Formats a date string (YYYY-MM-DD) to DD/MM/YYYY.
+         * @param {string} dateString - The date string in YYYY-MM-DD format.
+         * @returns {string} The formatted date string.
+         */
+        function formatDate(dateString) {
+            const date = new Date(dateString + 'T00:00:00'); // Ensures local timezone
+            const day = String(date.getDate()).padStart(2, '0');
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const year = date.getFullYear();
+            return `${day}/${month}/${year}`;
+        }
+
+        /**
+         * Gets the current date formatted as "DD de [Mês] de AAAA".
+         * @returns {string} The formatted current date.
+         */
+        function getCurrentDateFormatted() {
+            const today = new Date();
+            const day = String(today.getDate()).padStart(2, '0');
+            const monthNames = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
+            const month = monthNames[today.getMonth()];
+            const year = today.getFullYear();
+            return `${day} de ${month} de ${year}`;
+        }
+
+        // Define a data atual no elemento do recibo
+        document.getElementById('current-date-receipt').textContent = getCurrentDateFormatted();
+
+        /**
+         * Converts a number to its Portuguese word representation for monetary values.
+         * @param {number} num - The number to convert.
+         * @returns {string} The number in words.
+         */
+        function numberToWords(num) {
+            let numericValue = parseFloat(num);
+            if (isNaN(numericValue)) {
+                numericValue = 0;
+            }
+
+            const [reaisStr, centavosStr] = numericValue.toFixed(2).split('.');
+            let reaisNum = parseInt(reaisStr);
+            let centavosNum = parseInt(centavosStr);
+
+            const unidades = ["", "Um", "Dois", "Três", "Quatro", "Cinco", "Seis", "Sete", "Oito", "Nove"];
+            const especiais = ["Dez", "Onze", "Doze", "Treze", "Catorze", "Quinze", "Dezesseis", "Dezessete", "Dezoito", "Dezenove"];
+            const dezenas = ["", "", "Vinte", "Trinta", "Quarenta", "Cinquenta", "Sessenta", "Setenta", "Oitenta", "Noventa"];
+            const centenas = ["", "Cento", "Duzentos", "Trezentos", "Quatrocentos", "Quinhentos", "Seiscentos", "Setecentos", "Oitocentos", "Novecentos"];
+
+            function getWordsPart(n) {
+                if (n === 0) return "";
+                let str = "";
+                if (n >= 100) {
+                    if (n === 100) str += "Cem";
+                    else str += centenas[Math.floor(n / 100)];
+                    n %= 100;
+                    if (n > 0) str += " e ";
+                }
+                if (n >= 20) {
+                    str += dezenas[Math.floor(n / 10)];
+                    n %= 10;
+                    if (n > 0) str += " e ";
+                } else if (n >= 10) {
+                    str += especiais[n - 10];
+                    n = 0;
+                }
+                if (n > 0) {
+                    str += unidades[n];
+                }
+                return str;
+            }
+
+            let reaisText = getWordsPart(reaisNum);
+            if (reaisNum === 0) reaisText = "Zero";
+            reaisText += reaisNum === 1 ? " Real" : " Reais";
+
+            let centavosText = "";
+            if (centavosNum > 0) {
+                centavosText = getWordsPart(centavosNum);
+                centavosText += centavosNum === 1 ? " Centavo" : " Centavos";
+            }
+            
+            return reaisText + (centavosNum > 0 ? " e " + centavosText : "");
+        }
+
+        /**
+         * Renders the calendar for the current month and year.
+         */
+        function renderCalendar() {
+            calendarEl.innerHTML = '';
+            const today = new Date();
+            const firstDayOfMonth = new Date(currentCalendarYear, currentCalendarMonth, 1);
+            const lastDayOfMonth = new Date(currentCalendarYear, currentCalendarMonth + 1, 0);
+            const daysInMonth = lastDayOfMonth.getDate();
+            const firstDayOfWeek = firstDayOfMonth.getDay(); // 0 for Sunday, 1 for Monday, etc.
+
+            const monthNames = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+            const dayNames = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+
+            currentMonthYearEl.textContent = `${monthNames[currentCalendarMonth]} ${currentCalendarYear}`;
+
+            // Add day headers
+            dayNames.forEach(day => {
+                const dayHeader = document.createElement('div');
+                dayHeader.className = 'calendar-day header';
+                dayHeader.textContent = day;
+                calendarEl.appendChild(dayHeader);
+            });
+
+            // Fill in days from the previous month
+            for (let i = 0; i < firstDayOfWeek; i++) {
+                const prevMonthDate = new Date(currentCalendarYear, currentCalendarMonth, 0 - (firstDayOfWeek - 1 - i));
+                const dayEl = document.createElement('div');
+                dayEl.className = 'calendar-day other-month disabled-for-marking'; // Disable days from other months
+                dayEl.textContent = prevMonthDate.getDate();
+                calendarEl.appendChild(dayEl);
+            }
+
+            // Get selected period start and end dates
+            const periodStartDate = startDateInput.value ? new Date(startDateInput.value + 'T00:00:00') : null;
+            const periodEndDate = endDateInput.value ? new Date(endDateInput.value + 'T00:00:00') : null;
+
+            // Fill in days of the current month
+            for (let day = 1; day <= daysInMonth; day++) {
+                const date = new Date(currentCalendarYear, currentCalendarMonth, day);
+                const isoDateString = date.toISOString().split('T')[0];
+                const dayEl = document.createElement('div');
+                dayEl.className = 'calendar-day current-month';
+                dayEl.textContent = day;
+                dayEl.dataset.date = isoDateString; // Store ISO date for easy reference
+
+                // Add classes for holidays, absences, certificates, and today
+                if (holidays2025.some(h => h.date === isoDateString)) {
+                    dayEl.classList.add('holiday');
+                }
+                if (selectedAbsenceDates.has(isoDateString)) {
+                    dayEl.classList.add('selected-absence');
+                }
+                if (selectedCertificateDates.has(isoDateString)) {
+                    dayEl.classList.add('selected-certificate');
+                }
+                if (isoDateString === today.toISOString().split('T')[0]) {
+                    dayEl.classList.add('today');
+                }
+
+                // Check if the day is within the selected period to enable marking
+                if (periodStartDate && periodEndDate && date >= periodStartDate && date <= periodEndDate) {
+                    dayEl.addEventListener('click', () => toggleDateSelection(isoDateString, dayEl));
+                } else {
+                    dayEl.classList.add('disabled-for-marking'); // Disable days outside the period
+                }
+                calendarEl.appendChild(dayEl);
+            }
+
+            // Fill in days from the next month
+            const totalDaysDisplayed = firstDayOfWeek + daysInMonth;
+            const remainingDays = 42 - totalDaysDisplayed; // 6 rows * 7 days = 42 cells
+            for (let i = 1; i <= remainingDays; i++) {
+                const nextMonthDate = new Date(currentCalendarYear, currentCalendarMonth + 1, i);
+                const dayEl = document.createElement('div');
+                dayEl.className = 'calendar-day other-month disabled-for-marking'; // Disable days from other months
+                dayEl.textContent = nextMonthDate.getDate();
+                calendarEl.appendChild(dayEl);
+            }
+        }
+
+        /**
+         * Toggles the selection of a date as an absence, certificate, or clears the marking.
+         * @param {string} dateString - The date string in ISO format (YYYY-MM-DD).
+         * @param {HTMLElement} element - The calendar day element.
+         */
+        function toggleDateSelection(dateString, element) {
+            const date = new Date(dateString + 'T00:00:00');
+            const periodStartDate = startDateInput.value ? new Date(startDateInput.value + 'T00:00:00') : null;
+            const periodEndDate = endDateInput.value ? new Date(endDateInput.value + 'T00:00:00') : null;
+
+            // Prevent marking if the date is outside the selected period
+            if (!periodStartDate || !periodEndDate || date < periodStartDate || date > periodEndDate) {
+                return;
+            }
+
+            if (currentMarkType === 'absence') {
+                if (selectedAbsenceDates.has(dateString)) {
+                    selectedAbsenceDates.delete(dateString);
+                    element.classList.remove('selected-absence');
+                } else {
+                    selectedAbsenceDates.add(dateString);
+                    element.classList.add('selected-absence');
+                    selectedCertificateDates.delete(dateString); // Remove from certificate if marked as absence
+                    element.classList.remove('selected-certificate');
+                }
+            } else if (currentMarkType === 'certificate') {
+                if (selectedCertificateDates.has(dateString)) {
+                    selectedCertificateDates.delete(dateString);
+                    element.classList.remove('selected-certificate');
+                } else {
+                    selectedCertificateDates.add(dateString);
+                    element.classList.add('selected-certificate');
+                    selectedAbsenceDates.delete(dateString); // Remove from absence if marked as certificate
+                    element.classList.remove('selected-absence');
+                }
+            }
+            calculateEffectiveDays(); // Recalculate effective days after change
+        }
+
+        // Calendar navigation listeners
+        prevMonthBtn.addEventListener('click', () => {
+            currentCalendarMonth--;
+            if (currentCalendarMonth < 0) {
+                currentCalendarMonth = 11;
+                currentCalendarYear--;
+            }
+            renderCalendar();
+        });
+
+        nextMonthBtn.addEventListener('click', () => {
+            currentCalendarMonth++;
+            if (currentCalendarMonth > 11) {
+                currentCalendarMonth = 0;
+                currentCalendarYear++;
+            }
+            renderCalendar();
+        });
+
+        // Update selected marking type (absence, certificate)
+        document.querySelectorAll('input[name="markType"]').forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                currentMarkType = e.target.value;
+            });
+        });
+
+        // Listener for the "Clear Absences and Certificates" button
+        clearMarkingButton.addEventListener('click', () => {
+            selectedAbsenceDates.clear();
+            selectedCertificateDates.clear();
+            renderCalendar(); // Re-render calendar to remove visual markings
+            calculateEffectiveDays(); // Recalculate working days
+            showMessageModal("Marcações Limpas", "Todas as marcações de falta e atestado foram limpas.");
+        });
+
+        /**
+         * Calculates the effective working days, considering weekends, holidays, absences, and certificates.
+         * @returns {{effectiveDays: number, absenceDaysCount: number, certificateDaysCount: number}} Object containing counts.
+         */
+        function calculateEffectiveDays() {
+            const startDate = new Date(startDateInput.value + 'T00:00:00');
+            const endDate = new Date(endDateInput.value + 'T00:00:00');
+
+            // Validation: Selected period must be within the same month
+            if (isNaN(startDate) || isNaN(endDate) || startDate > endDate) {
+                workingDaysInfoEl.textContent = "0";
+                holidaysInPeriodEl.textContent = "Nenhum";
+                calculatedWorkingDays = 0;
+                holidaysFoundInPeriod = [];
+                return { effectiveDays: 0, absenceDaysCount: 0, certificateDaysCount: 0 };
+            }
+            
+            if (startDate.getMonth() !== endDate.getMonth() || startDate.getFullYear() !== endDate.getFullYear()) {
+                showMessageModal("Erro de Período", "O período selecionado deve estar contido no mesmo mês.");
+                workingDaysInfoEl.textContent = "0";
+                holidaysInPeriodEl.textContent = "Nenhum";
+                calculatedWorkingDays = 0;
+                holidaysFoundInPeriod = [];
+                return { effectiveDays: 0, absenceDaysCount: 0, certificateDaysCount: 0 };
+            }
+
+            let count = 0; // Effective working days
+            let absenceCount = 0; // Count of absences
+            let certificateCount = 0; // Count of certificates
+            holidaysFoundInPeriod = []; // Reset list of holidays found
+            const currentDate = new Date(startDate);
+
+            // Iterate over each day in the period
+            while (currentDate <= endDate) {
+                const dayOfWeek = currentDate.getDay();
+                const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6); // 0 = Sunday, 6 = Saturday
+                
+                const isoDateString = currentDate.toISOString().split('T')[0];
+                const holiday = holidays2025.find(h => h.date === isoDateString);
+                const isHoliday = holiday !== undefined;
+
+                const isAbsenceDay = selectedAbsenceDates.has(isoDateString);
+                const isCertificateDay = selectedCertificateDates.has(isoDateString);
+
+                // If it's not a weekend and not a holiday
+                if (!isWeekend && !isHoliday) {
+                    if (!isAbsenceDay && !isCertificateDay) {
+                        count++; // It's an effective working day
+                    } else {
+                        if (isAbsenceDay) absenceCount++;
+                        if (isCertificateDay) certificateCount++;
+                    }
+                } else if (isHoliday) {
+                    holidaysFoundInPeriod.push(holiday); // Add holiday to the list
+                }
+                currentDate.setDate(currentDate.getDate() + 1); // Advance to the next day
+            }
+            calculatedWorkingDays = count;
+            workingDaysInfoEl.textContent = calculatedWorkingDays;
+            
+            // Update display of holidays in the sidebar
+            if (holidaysFoundInPeriod.length > 0) {
+                holidaysInPeriodEl.textContent = holidaysFoundInPeriod.map(h => `${formatDate(h.date)} (${h.name})`).join(', ');
+            } else {
+                holidaysInPeriodEl.textContent = "Nenhum";
+            }
+
+            return { effectiveDays: calculatedWorkingDays, absenceDaysCount: absenceCount, certificateDaysCount: certificateCount };
+        }
+        
+        // Add listener for the calculate days button
+        calculateDaysButtonEl.addEventListener('click', calculateEffectiveDays);
+
+        /**
+         * Handles the change of the selected receipt type.
+         * Shows/hides relevant input fields based on the type.
+         */
+        function handleReceiptTypeChange() {
+            selectedReceiptType = document.querySelector('input[name="receiptType"]:checked').value;
+            
+            // Hide intern period container by default
+            internPeriodContainerEl.classList.add('hidden');
+            
+            // Show relevant container based on selected type
+            if (selectedReceiptType === 'salarioEstagiario') {
+                internPeriodContainerEl.classList.remove('hidden');
+            }
+
+            // Recalculate days if dates are already set
+            calculateEffectiveDays();
+        }
+
+        // Add listeners for receipt type radio buttons
+        document.querySelectorAll('input[name="receiptType"]').forEach(radio => {
+            radio.addEventListener('change', handleReceiptTypeChange);
+        });
+
+        /**
+         * Helper function to capitalize the first letter of each word in a string.
+         * @param {string} str - The input string.
+         * @returns {string} The capitalized string.
+         */
+        function capitalizeWords(str) {
+            return str.replace(/\b\w/g, char => char.toUpperCase());
+        }
+
+        /**
+         * Renders the list of employees based on a search filter.
+         * @param {string} filter - The search string.
+         */
+        function renderEmployeeList(filter = '') {
+            employeeListEl.innerHTML = '';
+            const filteredData = employeeData.filter(emp => emp.nome.toLowerCase().includes(filter.toLowerCase()));
+            
+            if (filteredData.length === 0) {
+                employeeListEl.innerHTML = `<p class="text-stone-500 p-4 text-center">Nenhuma funcionária encontrada.</p>`;
+                return;
+            }
+
+            filteredData.forEach(employee => {
+                const item = document.createElement('div');
+                item.className = 'p-3 mb-2 rounded-lg cursor-pointer hover:bg-teal-50 border-b border-stone-200 employee-item flex justify-between items-center';
+                item.innerHTML = `
+                    <span>${employee.nome}</span>
+                    <button class="text-red-500 hover:text-red-700 ml-2" data-cpf="${employee.cpf}" type="button">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/>
+                        </svg>
+                    </button>
+                `;
+                item.dataset.cpf = employee.cpf; // Store CPF for easy access
+                
+                // Add event listener for the employee item (excluding the delete button)
+                item.addEventListener('click', (event) => {
+                    if (!event.target.closest('button')) {
+                        selectEmployee(employee, item);
+                    }
+                });
+
+                // Add event listener for the delete button
+                const deleteButton = item.querySelector('button');
+                deleteButton.addEventListener('click', (event) => {
+                    event.stopPropagation(); // Prevent employee selection when clicking delete
+                    showDeleteConfirmationModal(employee.cpf, employee.nome); // Pass CPF as ID for local array
+                });
+
+                employeeListEl.appendChild(item);
+            });
+            // Add 'selected' class if employee is already selected
+            if (selectedEmployeeForReceipt) {
+                const currentSelectedEl = employeeListEl.querySelector(`[data-cpf="${selectedEmployeeForReceipt.cpf}"]`);
+                if (currentSelectedEl) {
+                    currentSelectedEl.classList.add('selected');
+                }
+            }
+        }
+
+        /**
+         * Selects an employee and updates the UI.
+         * @param {object} employee - The selected employee object.
+         * @param {HTMLElement} element - The HTML element representing the selected employee.
+         */
+        function selectEmployee(employee, element) {
+            // Remove 'selected' class from any previously selected employee
+            const currentlySelected = employeeListEl.querySelector('.employee-item.selected');
+            if (currentlySelected) {
+                currentlySelected.classList.remove('selected');
+            }
+            // Add 'selected' class to the clicked employee
+            element.classList.add('selected');
+            selectedEmployeeForReceipt = employee;
+            showMessageModal("Funcionária Selecionada", `Funcionária selecionada: ${employee.nome}`);
+
+            // Clear all fields when selecting a new employee
+            startDateInput.value = '';
+            endDateInput.value = '';
+            workingDaysInfoEl.textContent = "0";
+            holidaysInPeriodEl.textContent = "Nenhum";
+            selectedAbsenceDates.clear();
+            selectedCertificateDates.clear();
+            
+            // Reset calendar to current month
+            const today = new Date();
+            currentCalendarMonth = today.getMonth();
+            currentCalendarYear = today.getFullYear();
+            renderCalendar(); // Re-render calendar to remove visual markings
+
+            // Reset receipt type to Vale Transporte
+            document.querySelector('input[name="receiptType"][value="valeTransporte"]').checked = true;
+            handleReceiptTypeChange(); // Call to update interface with default receipt type
+
+            // Hide receipt content and show welcome message
+            receiptContentEl.classList.add('hidden');
+            welcomeMessageEl.classList.remove('hidden');
+        }
+
+        /**
+         * Formats the CPF input field.
+         * @param {Event} event - The input event.
+         */
+        function formatCpfInput(event) {
+            let value = event.target.value.replace(/\D/g, ''); // Remove all non-digits
+            let formattedValue = '';
+
+            if (value.length > 0) {
+                formattedValue += value.substring(0, 3);
+                if (value.length > 3) {
+                    formattedValue += '.' + value.substring(3, 6);
+                }
+                if (value.length > 6) {
+                    formattedValue += '.' + value.substring(6, 9);
+                }
+                if (value.length > 9) {
+                    formattedValue += '-' + value.substring(9, 11);
+                }
+            }
+            event.target.value = formattedValue;
+        }
+
+        // Add listener for the CPF input field
+        newEmployeeCpfInput.addEventListener('input', formatCpfInput);
+
+        /**
+         * Adds a new employee to the local employeeData array.
+         */
+        function addEmployee() {
+            const name = newEmployeeNameInput.value.trim();
+            const cpf = newEmployeeCpfInput.value.trim();
+
+            if (!name || !cpf) {
+                showMessageModal("Erro de Entrada", "Por favor, preencha o nome e o CPF da nova funcionária.");
+                return;
+            }
+
+            // Basic CPF format validation
+            const cpfRegex = /^\d{3}\.\d{3}\.\d{3}-\d{2}$/;
+            if (!cpfRegex.test(cpf)) {
+                showMessageModal("Erro de CPF", "Por favor, insira um CPF válido no formato XXX.XXX.XXX-XX.");
+                return;
+            }
+
+            // Check if CPF already exists
+            if (employeeData.some(emp => emp.cpf === cpf)) {
+                showMessageModal("Erro de CPF", "Já existe uma funcionária com este CPF.");
+                return;
+            }
+            
+            const capitalizedName = capitalizeWords(name);
+
+            employeeData.push({ nome: capitalizedName, cpf: cpf });
+            renderEmployeeList(); // Re-render the list to show the new employee
+            newEmployeeNameInput.value = '';
+            newEmployeeCpfInput.value = '';
+            showMessageModal("Sucesso", `Funcionária "${capitalizedName}" adicionada com sucesso!`);
+        }
+
+        /**
+         * Removes an employee from the local employeeData array after confirmation.
+         * @param {string} employeeCpf - The CPF of the employee to delete.
+         */
+        function performRemoveEmployee(employeeCpf) {
+            const initialLength = employeeData.length;
+            employeeData = employeeData.filter(emp => emp.cpf !== employeeCpf);
+            
+            if (employeeData.length < initialLength) {
+                renderEmployeeList(); // Re-render the list after removal
+                // If the removed employee was the selected one, clear selection
+                if (selectedEmployeeForReceipt && selectedEmployeeForReceipt.cpf === employeeCpf) {
+                    selectedEmployeeForReceipt = null;
+                    receiptContentEl.classList.add('hidden');
+                    welcomeMessageEl.classList.remove('hidden');
+                }
+                showMessageModal("Sucesso", `Funcionária removida com sucesso!`);
+            } else {
+                showMessageModal("Erro", "Funcionária não encontrada.");
+            }
+            employeeToDeleteCpf = null; // Clear the temporary storage
+        }
+
+        // Listener for the add employee button
+        addEmployeeButton.addEventListener('click', addEmployee);
+
+        /**
+         * Displays the confirmation modal before generating the receipt.
+         */
+        function showConfirmationModal() {
+            if (!selectedEmployeeForReceipt) {
+                showMessageModal("Erro de Seleção", "Por favor, selecione uma funcionária antes de gerar o recibo.");
+                return;
+            }
+
+            // Recalculate effective days before showing the modal to have the latest values
+            const { effectiveDays, absenceDaysCount, certificateDaysCount } = calculateEffectiveDays();
+
+            // Check if the period is valid before showing the modal
+            const startDate = new Date(startDateInput.value + 'T00:00:00');
+            const endDate = new Date(endDateInput.value + 'T00:00:00');
+            if (isNaN(startDate) || isNaN(endDate) || startDate > endDate || startDate.getMonth() !== endDate.getMonth() || startDate.getFullYear() !== endDate.getFullYear()) {
+                showMessageModal("Erro de Período", "Por favor, selecione um período válido e que esteja contido no mesmo mês antes de gerar um recibo.");
+                return;
+            }
+            
+            // Do not generate bonus if there's an absence or certificate
+            if (selectedReceiptType === 'bonificacao' && (absenceDaysCount > 0 || certificateDaysCount > 0)) {
+                showMessageModal("Erro de Bonificação", "Não é possível gerar o recibo de bonificação devido a falta ou atestado.");
+                return;
+            }
+
+            if (effectiveDays <= 0 && selectedReceiptType !== 'bonificacao') { // Bonus can be 0 due to absences
+                showMessageModal("Erro de Dias Úteis", "O período selecionado não resultou em dias úteis efetivos. Verifique as datas, feriados, faltas e atestados.");
+                return;
+            }
+            
+            modalEmployeeNameEl.textContent = `Gerar recibo para ${selectedEmployeeForReceipt.nome}?`;
+            confirmationModalEl.classList.remove('hidden');
+        }
+
+        /** Hides the confirmation modal. */
+        function hideConfirmationModal() {
+            confirmationModalEl.classList.add('hidden');
+        }
+        
+        // Listener for the confirm button in the modal
+        confirmButtonEl.addEventListener('click', () => {
+            if (selectedEmployeeForReceipt) {
+                generateReceipt(selectedEmployeeForReceipt);
+            }
+            hideConfirmationModal();
+        });
+
+        // Listener for the cancel button in the modal
+        cancelButtonEl.addEventListener('click', hideConfirmationModal);
+
+        // Listener for the "Generate Receipt" button
+        generateReceiptButton.addEventListener('click', showConfirmationModal);
+
+        /**
+         * Displays a generic message modal.
+         * @param {string} title - The title of the message.
+         * @param {string} content - The content of the message.
+         */
+        function showMessageModal(title, content) {
+            messageModalTitleEl.textContent = title;
+            messageModalContentEl.textContent = content;
+            messageModalEl.classList.remove('hidden');
+        }
+
+        /** Hides the generic message modal. */
+        function hideMessageModal() {
+            messageModalEl.classList.add('hidden');
+        }
+
+        messageModalCloseButton.addEventListener('click', hideMessageModal);
+
+        /**
+         * Displays the delete confirmation modal.
+         * @param {string} employeeCpf - The CPF of the employee to delete.
+         * @param {string} employeeName - The name of the employee to delete.
+         */
+        function showDeleteConfirmationModal(employeeCpf, employeeName) {
+            employeeToDeleteCpf = employeeCpf; // Store the CPF temporarily
+            deleteEmployeeNameEl.textContent = employeeName;
+            deleteConfirmationModalEl.classList.remove('hidden');
+        }
+
+        /** Hides the delete confirmation modal. */
+        function hideDeleteConfirmationModal() {
+            deleteConfirmationModalEl.classList.add('hidden');
+            employeeToDeleteCpf = null; // Clear temporary storage
+        }
+
+        confirmDeleteButton.addEventListener('click', () => {
+            performRemoveEmployee(employeeToDeleteCpf);
+            hideDeleteConfirmationModal();
+        });
+
+        cancelDeleteButton.addEventListener('click', hideDeleteConfirmationModal);
+
+        /**
+         * Generates the receipt based on the selected employee and calculated working days.
+         * @param {object} employee - The selected employee object.
+         */
+        function generateReceipt(employee) {
+            welcomeMessageEl.classList.add('hidden');
+            receiptContentEl.classList.remove('hidden');
+            
+            currentReceiptNumber++; // This should ideally be fetched/managed from a persistent source
+            let totalValue = 0; 
+            const { effectiveDays, absenceDaysCount, certificateDaysCount } = calculateEffectiveDays();
+
+            let receiptDescriptionText = "";
+            let receiptTitleText = "Recibo"; // Changed to simply "Recibo"
+
+            if (selectedReceiptType === 'valeTransporte') {
+                totalValue = effectiveDays * receiptBaseDetails.dailyValue;
+                receiptDescriptionText = "REFERENTE AO VALE TRANSPORTE";
+            } else if (selectedReceiptType === 'salarioEstagiario') {
+                const monthlyAllowance = 1100;
+                const standardWorkingDaysPerMonth = 22; 
+                const dailyAllowance = monthlyAllowance / standardWorkingDaysPerMonth;
+                totalValue = monthlyAllowance - (absenceDaysCount * dailyAllowance); // Only subtract absences
+                receiptDescriptionText = `REFERENTE À BOLSA ESTÁGIO (${internPeriodSelectEl.value === 'matutino' ? 'Período Matutino' : 'Período Vespertino'})`;
+            } else if (selectedReceiptType === 'bonificacao') {
+                const bonusAmount = receiptBaseDetails.fixedBonusAmount; 
+                totalValue = bonusAmount;
+                receiptDescriptionText = `REFERENTE À BONIFICAÇÃO`;
+            }
+
+            let words;
+            try {
+                words = numberToWords(totalValue);
+            } catch (e) {
+                console.error("Error converting number to words:", e);
+                words = "Erro na conversão"; 
+            }
+
+            receiptTitleEl.textContent = receiptTitleText; 
+            document.getElementById('receipt-id').textContent = currentReceiptNumber;
+            document.getElementById('receipt-total').textContent = formatCurrency(totalValue);
+            document.getElementById('receipt-payer').textContent = receiptBaseDetails.payer;
+            document.getElementById('receipt-cnpj').textContent = `CNPJ: ${receiptBaseDetails.cnpj}`;
+            document.getElementById('employee-name').textContent = employee.nome;
+            document.getElementById('employee-cpf').textContent = employee.cpf;
+            document.getElementById('receipt-description').textContent = receiptDescriptionText;
+            
+            const periodText = `<strong>Período:</strong> ${effectiveDays} dia(s) útil(eis) efetivo(s) de ${formatDate(startDateInput.value)} até ${formatDate(endDateInput.value)}.`;
+            document.getElementById('receipt-period-info').innerHTML = periodText;
+            
+            if (selectedReceiptType === 'valeTransporte') {
+                document.getElementById('receipt-daily-value').innerHTML = `<strong>Valor Diário:</strong> ${formatCurrency(receiptBaseDetails.dailyValue)}`;
+            } else if (selectedReceiptType === 'salarioEstagiario') {
+                document.getElementById('receipt-daily-value').innerHTML = ''; 
+            } else if (selectedReceiptType === 'bonificacao') {
+                 document.getElementById('receipt-daily-value').innerHTML = `<strong>Valor Fixo Mensal:</strong> ${formatCurrency(receiptBaseDetails.fixedBonusAmount)}`;
+            }
+            else {
+                document.getElementById('receipt-daily-value').innerHTML = ''; 
+            }
+
+            const holidaysInfoEl = document.getElementById('receipt-holidays-info');
+            let additionalInfo = '';
+            if (holidaysFoundInPeriod.length > 0) {
+                additionalInfo += `<strong>Feriado(s) no período:</strong><br>${holidaysFoundInPeriod.map(h => `- ${formatDate(h.date)}: ${h.name}`).join('<br>')}`;
+            }
+            if (selectedAbsenceDates.size > 0) {
+                const sortedAbsenceDates = Array.from(selectedAbsenceDates).sort();
+                additionalInfo += (additionalInfo ? '<br><br>' : '') + `<strong>Dia(s) de Falta:</strong><br>${sortedAbsenceDates.map(d => `- ${formatDate(d)}`).join('<br>')}`;
+            }
+            if (selectedCertificateDates.size > 0) {
+                const sortedCertificateDates = Array.from(selectedCertificateDates).sort();
+                additionalInfo += (additionalInfo ? '<br><br>' : '') + `<strong>Dia(s) de Atestado:</strong><br>${sortedCertificateDates.map(d => `- ${formatDate(d)}`).join('<br>')}`;
+            }
+            holidaysInfoEl.innerHTML = additionalInfo;
+
+            document.getElementById('receipt-total-words').textContent = words; 
+            document.getElementById('employee-signature-name').textContent = employee.nome;
+            document.getElementById('receipt-location-date').innerHTML = `${receiptBaseDetails.location}, <span id="current-date-receipt">${getCurrentDateFormatted()}</span>.`;
+            
+            // The chart is now hidden by CSS for print, so no need to explicitly update it for print purposes.
+            // It will still update for screen display.
+            updateChart(employee, totalValue); 
+        }
+
+        /**
+         * Updates the payment comparison chart.
+         * @param {object} selectedEmployee - The currently selected employee.
+         * @param {number} currentTotal - The total payment for the selected employee.
+         */
+        function updateChart(selectedEmployee, currentTotal) {
+            const ctx = document.getElementById('paymentChart').getContext('2d');
+            const averagePayment = 175.50; // Example fixed average payment
+
+            const data = {
+                labels: [selectedEmployee.nome, 'Média Geral (Exemplo)'],
+                datasets: [{
+                    label: 'Valor do Pagamento (R$)',
+                    data: [currentTotal, averagePayment],
+                    backgroundColor: [
+                        'rgba(13, 148, 136, 0.6)', 
+                        'rgba(120, 113, 108, 0.6)' 
+                    ],
+                    borderColor: [
+                        'rgb(13, 148, 136)',
+                        'rgb(120, 113, 108)'
+                    ],
+                    borderWidth: 2
+                }]
+            };
+
+            const options = {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.dataset.label || '';
+                                if (label) { label += ': '; }
+                                if (context.parsed.y !== null) { label += formatCurrency(context.parsed.y); }
+                                return label;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { callback: function(value) { return 'R$ ' + value; } }
+                    }
+                }
+            };
+            
+            if (paymentChart) { paymentChart.destroy(); }
+            paymentChart = new Chart(ctx, { type: 'bar', data: data, options: options });
+        }
+        
+        // Event listener for search input
+        searchInputEl.addEventListener('keyup', (e) => renderEmployeeList(e.target.value));
+
+        // Event listeners for date inputs to clear selections and re-render calendar
+        startDateInput.addEventListener('change', () => {
+            if (startDateInput.value) {
+                const date = new Date(startDateInput.value);
+                currentCalendarMonth = date.getMonth();
+                currentCalendarYear = date.getFullYear();
+            }
+            selectedAbsenceDates.clear(); 
+            selectedCertificateDates.clear(); 
+            renderCalendar();
+            calculateEffectiveDays();
+        });
+
+        endDateInput.addEventListener('change', () => {
+            selectedAbsenceDates.clear(); 
+            selectedCertificateDates.clear(); 
+            renderCalendar();
+            calculateEffectiveDays();
+        });
+        
+        // Initialize the app on window load
+        window.onload = () => { // Removed async as Firebase is no longer used
+            renderEmployeeList(); // Initial render of the employee list
+            document.getElementById('current-date-receipt').textContent = getCurrentDateFormatted();
+            const today = new Date();
+            const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+            const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+
+            startDateInput.value = firstDayOfMonth.toISOString().split('T')[0];
+            endDateInput.value = lastDayOfMonth.toISOString().split('T')[0];
+            
+            handleReceiptTypeChange(); 
+            calculateEffectiveDays(); 
+            renderCalendar(); 
+        };
+
+    </script>
+</body>
+</html>
