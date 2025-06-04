@@ -399,51 +399,50 @@
         ];
         
         // Elementos do DOM
-        const employeeListEl = document.getElementById('employeeList');
-        const searchInputEl = document.getElementById('searchInput');
-        const welcomeMessageEl = document.getElementById('welcome-message');
-        const receiptContentEl = document.getElementById('receipt-content');
-        const startDateInput = document.getElementById('startDate');
-        const endDateInput = document.getElementById('endDate');
-        const workingDaysInfoEl = document.getElementById('workingDaysInfo');
-        const calculateDaysButtonEl = document.getElementById('calculateDaysButton');
-        const holidaysInPeriodEl = document.getElementById('holidaysInPeriod');
+        let employeeListEl;
+        let searchInputEl;
+        let welcomeMessageEl;
+        let receiptContentEl;
+        let startDateInput;
+        let endDateInput;
+        let workingDaysInfoEl;
+        let calculateDaysButtonEl;
+        let holidaysInPeriodEl;
         
-        const confirmationModalEl = document.getElementById('confirmationModal');
-        const modalEmployeeNameEl = document.getElementById('modalEmployeeName');
-        const confirmButtonEl = document.getElementById('confirmButton');
-        const cancelButtonEl = document.getElementById('cancelButton');
+        let confirmationModalEl;
+        let modalEmployeeNameEl;
+        let confirmButtonEl;
+        let cancelButtonEl;
 
-        const receiptTypeSelectionEl = document.getElementById('receiptTypeSelection');
-        const internPeriodContainerEl = document.getElementById('internPeriodContainer');
-        const internPeriodSelectEl = document.getElementById('internPeriod');
-        const receiptTitleEl = document.getElementById('receipt-title');
+        let receiptTypeSelectionEl;
+        let internPeriodContainerEl;
+        let internPeriodSelectEl;
+        let receiptTitleEl;
 
         // Elementos do calendário
-        const calendarEl = document.getElementById('calendar');
-        const currentMonthYearEl = document.getElementById('currentMonthYear');
-        const prevMonthBtn = document.getElementById('prevMonth');
-        const nextMonthBtn = document.getElementById('nextMonth');
-        const clearMarkingButton = document.getElementById('clearMarkingButton');
-        const generateReceiptButton = document.getElementById('generateReceiptButton');
+        let calendarEl;
+        let currentMonthYearEl;
+        let prevMonthBtn;
+        let nextMonthBtn;
+        let clearMarkingButton;
+        let generateReceiptButton;
 
         // Elementos do novo modal de mensagem
-        const messageModalEl = document.getElementById('messageModal');
-        const messageModalTitleEl = document.getElementById('messageModalTitle');
-        const messageModalContentEl = document.getElementById('messageModalContent');
-        const messageModalCloseButton = document.getElementById('messageModalCloseButton');
+        let messageModalEl;
+        let messageModalTitleEl;
+        let messageModalContentEl;
+        let messageModalCloseButton;
 
         // Elementos para adicionar/remover funcionárias
-        const newEmployeeNameInput = document.getElementById('newEmployeeName');
-        const newEmployeeCpfInput = document.getElementById('newEmployeeCpf');
-        const addEmployeeButton = document.getElementById('addEmployeeButton');
-        // Removed userIdDisplayEl as Firebase is no longer used
+        let newEmployeeNameInput;
+        let newEmployeeCpfInput;
+        let addEmployeeButton;
 
         // Elementos do novo modal de confirmação de exclusão
-        const deleteConfirmationModalEl = document.getElementById('deleteConfirmationModal');
-        const deleteEmployeeNameEl = document.getElementById('deleteEmployeeName');
-        const cancelDeleteButton = document.getElementById('cancelDeleteButton');
-        const confirmDeleteButton = document.getElementById('confirmDeleteButton');
+        let deleteConfirmationModalEl;
+        let deleteEmployeeNameEl;
+        let cancelDeleteButton;
+        let confirmDeleteButton;
 
         let paymentChart = null;
         let currentReceiptNumber = 99; // This should ideally be stored persistently too
@@ -469,7 +468,7 @@
         
         /**
          * Formats a date string (YYYY-MM-DD) to DD/MM/YYYY.
-         * @param {string} dateString - The date string in YYYY-MM-DD format.
+         * @param {string} dateString - The date string in DD-MM-YYYY format.
          * @returns {string} The formatted date string.
          */
         function formatDate(dateString) {
@@ -492,9 +491,6 @@
             const year = today.getFullYear();
             return `${day} de ${month} de ${year}`;
         }
-
-        // Define a data atual no elemento do recibo
-        document.getElementById('current-date-receipt').textContent = getCurrentDateFormatted();
 
         /**
          * Converts a number to its Portuguese word representation for monetary values.
@@ -552,8 +548,9 @@
             }
 
             let reaisText = getWordsPart(reaisNum);
-            if (reaisNum === 0) reaisText = "zero"; // Changed to "zero" for consistency
-            reaisText += reaisNum === 1 ? " real" : " reais"; // Changed to lowercase for consistency
+            if (reaisNum === 0 && centavosNum === 0) reaisText = "zero"; // Changed to "zero" for consistency
+            else if (reaisNum === 0) reaisText = ""; // If no reais, don't say "zero reais"
+            else reaisText += reaisNum === 1 ? " real" : " reais"; // Changed to lowercase for consistency
 
             let centavosText = "";
             if (centavosNum > 0) {
@@ -562,12 +559,14 @@
             }
             
             // Combine reais and centavos
-            if (centavosNum > 0 && reaisNum > 0) {
+            if (reaisNum > 0 && centavosNum > 0) {
                 return `${reaisText} e ${centavosText}`;
             } else if (centavosNum > 0) {
                 return centavosText;
-            } else {
+            } else if (reaisNum > 0) {
                 return reaisText;
+            } else {
+                return "zero reais"; // Fallback for exactly 0.00
             }
         }
 
@@ -691,41 +690,6 @@
             calculateEffectiveDays(); // Recalculate effective days after change
         }
 
-        // Calendar navigation listeners
-        prevMonthBtn.addEventListener('click', () => {
-            currentCalendarMonth--;
-            if (currentCalendarMonth < 0) {
-                currentCalendarMonth = 11;
-                currentCalendarYear--;
-            }
-            renderCalendar();
-        });
-
-        nextMonthBtn.addEventListener('click', () => {
-            currentCalendarMonth++;
-            if (currentCalendarMonth > 11) {
-                currentCalendarMonth = 0;
-                currentCalendarYear++;
-            }
-            renderCalendar();
-        });
-
-        // Update selected marking type (absence, certificate)
-        document.querySelectorAll('input[name="markType"]').forEach(radio => {
-            radio.addEventListener('change', (e) => {
-                currentMarkType = e.target.value;
-            });
-        });
-
-        // Listener for the "Clear Absences and Certificates" button
-        clearMarkingButton.addEventListener('click', () => {
-            selectedAbsenceDates.clear();
-            selectedCertificateDates.clear();
-            renderCalendar(); // Re-render calendar to remove visual markings
-            calculateEffectiveDays(); // Recalculate working days
-            showMessageModal("Marcações Limpas", "Todas as marcações de falta e atestado foram limpas.");
-        });
-
         /**
          * Calculates the effective working days, considering weekends, holidays, absences, and certificates.
          * @returns {{effectiveDays: number, absenceDaysCount: number, certificateDaysCount: number}} Object containing counts.
@@ -758,10 +722,10 @@
             holidaysFoundInPeriod = []; // Reset list of holidays found
             const currentDate = new Date(startDate);
 
-            // Iterate over each day in the period
+            // Itera sobre cada dia no período
             while (currentDate <= endDate) {
                 const dayOfWeek = currentDate.getDay();
-                const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6); // 0 = Sunday, 6 = Saturday
+                const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6); // 0 = Domingo, 6 = Sábado
                 
                 const isoDateString = currentDate.toISOString().split('T')[0];
                 const holiday = holidays2025.find(h => h.date === isoDateString);
@@ -773,20 +737,20 @@
                 // If it's not a weekend and not a holiday
                 if (!isWeekend && !isHoliday) {
                     if (!isAbsenceDay && !isCertificateDay) {
-                        count++; // It's an effective working day
+                        count++; // É um dia útil efetivo
                     } else {
                         if (isAbsenceDay) absenceCount++;
                         if (isCertificateDay) certificateCount++;
                     }
                 } else if (isHoliday) {
-                    holidaysFoundInPeriod.push(holiday); // Add holiday to the list
+                    holidaysFoundInPeriod.push(holiday); // Adiciona o feriado à lista
                 }
-                currentDate.setDate(currentDate.getDate() + 1); // Advance to the next day
+                currentDate.setDate(currentDate.getDate() + 1); // Avança para o próximo dia
             }
             calculatedWorkingDays = count;
             workingDaysInfoEl.textContent = calculatedWorkingDays;
             
-            // Update display of holidays in the sidebar
+            // Atualiza a exibição dos feriados no período na barra lateral
             if (holidaysFoundInPeriod.length > 0) {
                 holidaysInPeriodEl.textContent = holidaysFoundInPeriod.map(h => `${formatDate(h.date)} (${h.name})`).join(', ');
             } else {
@@ -796,9 +760,6 @@
             return { effectiveDays: calculatedWorkingDays, absenceDaysCount: absenceCount, certificateDaysCount: certificateCount };
         }
         
-        // Add listener for the calculate days button
-        calculateDaysButtonEl.addEventListener('click', calculateEffectiveDays);
-
         /**
          * Handles the change of the selected receipt type.
          * Shows/hides relevant input fields based on the type.
@@ -817,11 +778,6 @@
             // Recalculate days if dates are already set
             calculateEffectiveDays();
         }
-
-        // Add listeners for receipt type radio buttons
-        document.querySelectorAll('input[name="receiptType"]').forEach(radio => {
-            radio.addEventListener('change', handleReceiptTypeChange);
-        });
 
         /**
          * Helper function to capitalize the first letter of each word in a string.
@@ -945,9 +901,6 @@
             event.target.value = formattedValue;
         }
 
-        // Add listener for the CPF input field
-        newEmployeeCpfInput.addEventListener('input', formatCpfInput);
-
         /**
          * Adds a new employee to the local employeeData array.
          */
@@ -1005,9 +958,6 @@
             employeeToDeleteCpf = null; // Clear the temporary storage
         }
 
-        // Listener for the add employee button
-        addEmployeeButton.addEventListener('click', addEmployee);
-
         /**
          * Displays the confirmation modal before generating the receipt.
          */
@@ -1048,20 +998,6 @@
             confirmationModalEl.classList.add('hidden');
         }
         
-        // Listener for the confirm button in the modal
-        confirmButtonEl.addEventListener('click', () => {
-            if (selectedEmployeeForReceipt) {
-                generateReceipt(selectedEmployeeForReceipt);
-            }
-            hideConfirmationModal();
-        });
-
-        // Listener for the cancel button in the modal
-        cancelButtonEl.addEventListener('click', hideConfirmationModal);
-
-        // Listener for the "Generate Receipt" button
-        generateReceiptButton.addEventListener('click', showConfirmationModal);
-
         /**
          * Displays a generic message modal.
          * @param {string} title - The title of the message.
@@ -1077,8 +1013,6 @@
         function hideMessageModal() {
             messageModalEl.classList.add('hidden');
         }
-
-        messageModalCloseButton.addEventListener('click', hideMessageModal);
 
         /**
          * Displays the delete confirmation modal.
@@ -1096,13 +1030,6 @@
             deleteConfirmationModalEl.classList.add('hidden');
             employeeToDeleteCpf = null; // Clear temporary storage
         }
-
-        confirmDeleteButton.addEventListener('click', () => {
-            performRemoveEmployee(employeeToDeleteCpf);
-            hideDeleteConfirmationModal();
-        });
-
-        cancelDeleteButton.addEventListener('click', hideDeleteConfirmationModal);
 
         /**
          * Generates the receipt based on the selected employee and calculated working days.
@@ -1156,8 +1083,8 @@
             const monthNames = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
             const monthName = monthNames[startDateObj.getMonth()];
 
-            // Updated Period Text
-            const periodText = `<strong>Período:</strong> dias trabalhados do mês de ${monthName} (${formatDate(startDateInput.value)} até ${formatDate(endDateInput.value)}).`;
+            // Updated Period Text to include effectiveDays
+            const periodText = `<strong>Período:</strong> ${effectiveDays} dias trabalhados do mês de ${monthName} (${formatDate(startDateInput.value)} até ${formatDate(endDateInput.value)}).`;
             document.getElementById('receipt-period-info').innerHTML = periodText;
             
             let dailyValueHtml = '';
@@ -1249,32 +1176,113 @@
             paymentChart = new Chart(ctx, { type: 'bar', data: data, options: options });
         }
         
-        // Event listener for search input
-        searchInputEl.addEventListener('keyup', (e) => renderEmployeeList(e.target.value));
-
-        // Event listeners for date inputs to clear selections and re-render calendar
-        startDateInput.addEventListener('change', () => {
-            if (startDateInput.value) {
-                const date = new Date(startDateInput.value);
-                currentCalendarMonth = date.getMonth();
-                currentCalendarYear = date.getFullYear();
-            }
-            selectedAbsenceDates.clear(); 
-            selectedCertificateDates.clear(); 
-            renderCalendar();
-            calculateEffectiveDays();
-        });
-
-        endDateInput.addEventListener('change', () => {
-            selectedAbsenceDates.clear(); 
-            selectedCertificateDates.clear(); 
-            renderCalendar();
-            calculateEffectiveDays();
-        });
-        
         // Initialize the app on window load
-        window.onload = () => { // Removed async as Firebase is no longer used
-            renderEmployeeList(); // Initial render of the employee list
+        window.onload = () => {
+            // DOM element references
+            employeeListEl = document.getElementById('employeeList');
+            searchInputEl = document.getElementById('searchInput');
+            welcomeMessageEl = document.getElementById('welcome-message');
+            receiptContentEl = document.getElementById('receipt-content');
+            startDateInput = document.getElementById('startDate');
+            endDateInput = document.getElementById('endDate');
+            workingDaysInfoEl = document.getElementById('workingDaysInfo');
+            calculateDaysButtonEl = document.getElementById('calculateDaysButton');
+            holidaysInPeriodEl = document.getElementById('holidaysInPeriod');
+            confirmationModalEl = document.getElementById('confirmationModal');
+            modalEmployeeNameEl = document.getElementById('modalEmployeeName');
+            confirmButtonEl = document.getElementById('confirmButton');
+            cancelButtonEl = document.getElementById('cancelButton');
+            receiptTypeSelectionEl = document.getElementById('receiptTypeSelection');
+            internPeriodContainerEl = document.getElementById('internPeriodContainer');
+            internPeriodSelectEl = document.getElementById('internPeriod');
+            receiptTitleEl = document.getElementById('receipt-title');
+            calendarEl = document.getElementById('calendar');
+            currentMonthYearEl = document.getElementById('currentMonthYear');
+            prevMonthBtn = document.getElementById('prevMonth');
+            nextMonthBtn = document.getElementById('nextMonth');
+            clearMarkingButton = document.getElementById('clearMarkingButton');
+            generateReceiptButton = document.getElementById('generateReceiptButton');
+            messageModalEl = document.getElementById('messageModal');
+            messageModalTitleEl = document.getElementById('messageModalTitle');
+            messageModalContentEl = document.getElementById('messageModalContent');
+            messageModalCloseButton = document.getElementById('messageModalCloseButton');
+            newEmployeeNameInput = document.getElementById('newEmployeeName');
+            newEmployeeCpfInput = document.getElementById('newEmployeeCpf');
+            addEmployeeButton = document.getElementById('addEmployeeButton');
+            deleteConfirmationModalEl = document.getElementById('deleteConfirmationModal');
+            deleteEmployeeNameEl = document.getElementById('deleteEmployeeName');
+            cancelDeleteButton = document.getElementById('cancelDeleteButton');
+            confirmDeleteButton = document.getElementById('confirmDeleteButton'); // Corrected ID
+
+            // Event listener attachments - moved inside window.onload
+            searchInputEl.addEventListener('keyup', (e) => renderEmployeeList(e.target.value));
+            startDateInput.addEventListener('change', () => {
+                if (startDateInput.value) {
+                    const date = new Date(startDateInput.value);
+                    currentCalendarMonth = date.getMonth();
+                    currentCalendarYear = date.getFullYear();
+                }
+                selectedAbsenceDates.clear(); 
+                selectedCertificateDates.clear(); 
+                renderCalendar();
+                calculateEffectiveDays();
+            });
+            endDateInput.addEventListener('change', () => {
+                selectedAbsenceDates.clear(); 
+                selectedCertificateDates.clear(); 
+                renderCalendar();
+                calculateEffectiveDays();
+            });
+            calculateDaysButtonEl.addEventListener('click', calculateEffectiveDays);
+            document.querySelectorAll('input[name="receiptType"]').forEach(radio => {
+                radio.addEventListener('change', handleReceiptTypeChange);
+            });
+            prevMonthBtn.addEventListener('click', () => {
+                currentCalendarMonth--;
+                if (currentCalendarMonth < 0) {
+                    currentCalendarMonth = 11;
+                    currentCalendarYear--;
+                }
+                renderCalendar();
+            });
+            nextMonthBtn.addEventListener('click', () => {
+                currentCalendarMonth++;
+                if (currentCalendarMonth > 11) {
+                    currentCalendarMonth = 0;
+                    currentCalendarYear++;
+                }
+                renderCalendar();
+            });
+            document.querySelectorAll('input[name="markType"]').forEach(radio => {
+                radio.addEventListener('change', (e) => {
+                    currentMarkType = e.target.value;
+                });
+            });
+            clearMarkingButton.addEventListener('click', () => {
+                selectedAbsenceDates.clear();
+                selectedCertificateDates.clear();
+                renderCalendar();
+                calculateEffectiveDays();
+                showMessageModal("Marcações Limpas", "Todas as marcações de falta e atestado foram limpas.");
+            });
+            generateReceiptButton.addEventListener('click', showConfirmationModal);
+            newEmployeeCpfInput.addEventListener('input', formatCpfInput);
+            addEmployeeButton.addEventListener('click', addEmployee);
+            confirmButtonEl.addEventListener('click', () => {
+                if (selectedEmployeeForReceipt) {
+                    generateReceipt(selectedEmployeeForReceipt);
+                }
+                hideConfirmationModal();
+            });
+            cancelButtonEl.addEventListener('click', hideConfirmationModal);
+            messageModalCloseButton.addEventListener('click', hideMessageModal);
+            confirmDeleteButton.addEventListener('click', () => {
+                performRemoveEmployee(employeeToDeleteCpf);
+                hideDeleteConfirmationModal();
+            });
+            cancelDeleteButton.addEventListener('click', hideDeleteConfirmationModal);
+
+            // Initial setup calls
             document.getElementById('current-date-receipt').textContent = getCurrentDateFormatted();
             const today = new Date();
             const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -1283,6 +1291,7 @@
             startDateInput.value = firstDayOfMonth.toISOString().split('T')[0];
             endDateInput.value = lastDayOfMonth.toISOString().split('T')[0];
             
+            renderEmployeeList(); // Initial render of the employee list
             handleReceiptTypeChange(); 
             calculateEffectiveDays(); 
             renderCalendar(); 
