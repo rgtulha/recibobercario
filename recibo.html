@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gerenciador de Recibos Simples</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -127,7 +127,7 @@
         }
     </style>
 </head>
-<body class="text-stone-700">
+<body>
 
     <main class="flex flex-col md:flex-row w-full min-h-screen">
         
@@ -171,11 +171,13 @@
                 <label for="endDate" class="block text-sm font-medium text-stone-700 mb-1">Data de Fim:</label>
                 <input type="date" id="endDate" name="endDate" class="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500">
             </div>
-             <div class="mb-4">
+            <div id="calculateDaysButtonContainer" class="mb-4 hidden"> <!-- Added hidden class here -->
                 <button id="calculateDaysButton" class="w-full px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors shadow-md">Calcular Dias Úteis</button>
             </div>
-            <p class="text-sm text-stone-600 mb-4">Dias Úteis Calculados: <span id="workingDaysInfo" class="font-semibold">0</span></p>
-            <p class="text-xs text-stone-500 mb-4">Feriados no Período: <span id="holidaysInPeriod" class="font-semibold text-red-500">Nenhum</span></p>
+            <div id="periodInfoContainer" class="hidden"> <!-- Added hidden class here -->
+                <p class="text-sm text-stone-600 mb-4">Dias Úteis Calculados: <span id="workingDaysInfo" class="font-semibold">0</span></p>
+                <p class="text-xs text-stone-500 mb-4">Feriados no Período: <span id="holidaysInPeriod" class="font-semibold text-red-500">Nenhum</span></p>
+            </div>
 
             <div id="internPeriodContainer" class="mb-4 hidden">
                 <label for="internPeriod" class="block text-sm font-medium text-stone-700 mb-1">Período do Estagiário:</label>
@@ -226,6 +228,12 @@
                 </div>
                 <button id="addEmployeeButton" class="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-md">Adicionar Funcionária</button>
             </div>
+            
+            <div class="mt-6">
+                <button id="exportEmployeesButton" class="w-full px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors shadow-md">
+                    Exportar Funcionárias (TXT)
+                </button>
+            </div>
 
         </aside>
 
@@ -252,8 +260,8 @@
                 <div class="bg-white p-8 rounded-xl shadow-lg border border-stone-200">
                     <div class="grid grid-cols-2 gap-x-8 gap-y-4 mb-8 pb-4 border-b-2 border-dashed">
                         <div>
-                            <p class="text-sm text-stone-500">Nº do Recibo</p>
-                            <p id="receipt-id" class="text-lg font-semibold text-stone-800"></p>
+                            <p class="text-sm text-stone-500">Data do Recibo</p>
+                            <p id="receipt-date-top" class="text-lg font-semibold text-stone-800"></p>
                         </div>
                         <div class="text-right">
                              <p class="text-sm text-stone-500">VALOR TOTAL</p>
@@ -288,7 +296,7 @@
                         </div>
                         
                         <p class="text-lg text-stone-800 font-semibold mt-4 pt-4 border-t border-stone-200">
-                            Quantia por extenso: <span id="receipt-total-words" class="font-normal"></span>
+                            <span id="receipt-total-words-label">Quantia por extenso: </span><span id="receipt-total-words" class="font-normal"></span>
                         </p>
                     </div>
                     
@@ -298,18 +306,10 @@
                         <p class="text-sm text-stone-500">Assinatura do(a) Colaborador(a)</p>
                     </div>
 
-                    <div class="mt-8 text-center text-sm text-stone-500">
-                        <p id="receipt-location-date">Goiânia, <span id="current-date-receipt"></span>.</p>
-                    </div>
+                    <!-- Removed receipt-location-date from here -->
                 </div>
 
-                <div class="mt-10 pt-6 border-t border-stone-200 no-print"> <!-- Added no-print class here -->
-                    <h3 class="text-xl font-bold text-stone-800 mb-4 text-center">Análise Comparativa de Pagamento</h3>
-                    <p class="text-center text-stone-600 mb-6 max-w-2xl mx-auto">Este gráfico compara o valor do vale transporte da funcionária selecionada com a média de pagamentos (valor fixo para demonstração).</p>
-                    <div class="chart-container">
-                        <canvas id="paymentChart"></canvas>
-                    </div>
-                </div>
+                <!-- Removed Análise Comparativa de Pagamento and chart section -->
             </div>
         </section>
     </main>
@@ -408,6 +408,8 @@
         let workingDaysInfoEl;
         let calculateDaysButtonEl;
         let holidaysInPeriodEl;
+        let calculateDaysButtonContainerEl; 
+        let periodInfoContainerEl; 
         
         let confirmationModalEl;
         let modalEmployeeNameEl;
@@ -418,6 +420,7 @@
         let internPeriodContainerEl;
         let internPeriodSelectEl;
         let receiptTitleEl;
+        let receiptDateTopEl; 
 
         // Elementos do calendário
         let calendarEl;
@@ -437,6 +440,7 @@
         let newEmployeeNameInput;
         let newEmployeeCpfInput;
         let addEmployeeButton;
+        let exportEmployeesButton; 
 
         // Elementos do novo modal de confirmação de exclusão
         let deleteConfirmationModalEl;
@@ -444,18 +448,21 @@
         let cancelDeleteButton;
         let confirmDeleteButton;
 
-        let paymentChart = null;
+        // Removed paymentChart as it's no longer used
         let currentReceiptNumber = 99; // This should ideally be stored persistently too
         let selectedEmployeeForReceipt = null;
         let calculatedWorkingDays = 0;
         let holidaysFoundInPeriod = [];
-        let selectedAbsenceDates = new Set();
-        let selectedCertificateDates = new Set();
+        let selectedAbsenceDates = new Set(); // Global set for all marked dates
+        let selectedCertificateDates = new Set(); // Global set for all marked dates
         let selectedReceiptType = 'valeTransporte';
         let currentCalendarMonth = new Date().getMonth();
         let currentCalendarYear = new Date().getFullYear();
         let currentMarkType = 'absence';
-        let employeeToDeleteCpf = null; // Changed to employeeToDeleteId to match the new employee object structure
+        let employeeToDeleteCpf = null;
+
+        // Variable to control which period is active for calendar marking
+        let calendarMarkablePeriod = { start: null, end: null };
 
         /**
          * Formats a numeric value to Brazilian currency (BRL).
@@ -603,10 +610,6 @@
                 calendarEl.appendChild(dayEl);
             }
 
-            // Get selected period start and end dates
-            const periodStartDate = startDateInput.value ? new Date(startDateInput.value + 'T00:00:00') : null;
-            const periodEndDate = endDateInput.value ? new Date(endDateInput.value + 'T00:00:00') : null;
-
             // Fill in days of the current month
             for (let day = 1; day <= daysInMonth; day++) {
                 const date = new Date(currentCalendarYear, currentCalendarMonth, day);
@@ -630,11 +633,12 @@
                     dayEl.classList.add('today');
                 }
 
-                // Check if the day is within the selected period to enable marking
-                if (periodStartDate && periodEndDate && date >= periodStartDate && date <= periodEndDate) {
+                // Check if the day is within the active marking period
+                if (calendarMarkablePeriod.start && calendarMarkablePeriod.end && 
+                    date >= calendarMarkablePeriod.start && date <= calendarMarkablePeriod.end) {
                     dayEl.addEventListener('click', () => toggleDateSelection(isoDateString, dayEl));
                 } else {
-                    dayEl.classList.add('disabled-for-marking'); // Disable days outside the period
+                    dayEl.classList.add('disabled-for-marking'); // Disable days outside the markable period
                 }
                 calendarEl.appendChild(dayEl);
             }
@@ -658,11 +662,10 @@
          */
         function toggleDateSelection(dateString, element) {
             const date = new Date(dateString + 'T00:00:00');
-            const periodStartDate = startDateInput.value ? new Date(startDateInput.value + 'T00:00:00') : null;
-            const periodEndDate = endDateInput.value ? new Date(endDateInput.value + 'T00:00:00') : null;
 
-            // Prevent marking if the date is outside the selected period
-            if (!periodStartDate || !periodEndDate || date < periodStartDate || date > periodEndDate) {
+            // Impede a marcação se a data estiver fora do período de marcação ativo
+            if (!calendarMarkablePeriod.start || !calendarMarkablePeriod.end || 
+                date < calendarMarkablePeriod.start || date > calendarMarkablePeriod.end) {
                 return;
             }
 
@@ -673,7 +676,7 @@
                 } else {
                     selectedAbsenceDates.add(dateString);
                     element.classList.add('selected-absence');
-                    selectedCertificateDates.delete(dateString); // Remove from certificate if marked as absence
+                    selectedCertificateDates.delete(dateString); // Remove de atestado se for marcado como falta
                     element.classList.remove('selected-certificate');
                 }
             } else if (currentMarkType === 'certificate') {
@@ -683,86 +686,75 @@
                 } else {
                     selectedCertificateDates.add(dateString);
                     element.classList.add('selected-certificate');
-                    selectedAbsenceDates.delete(dateString); // Remove from absence if marked as certificate
+                    selectedAbsenceDates.delete(dateString); // Remove de falta se for marcado como atestado
                     element.classList.remove('selected-absence');
                 }
             }
-            calculateEffectiveDays(); // Recalculate effective days after change
+            // Recalcula os dias efetivos após a alteração
+            updateReceiptDisplay(); 
         }
 
         /**
-         * Calculates the effective working days, considering weekends, holidays, absences, and certificates.
-         * @returns {{effectiveDays: number, absenceDaysCount: number, certificateDaysCount: number}} Object containing counts.
+         * Calculates effective working days within a given date range, considering marked absences/certificates.
+         * @param {Date} startDate - The start date of the period.
+         * @param {Date} endDate - The end date of the period.
+         * @param {Set<string>} absencesSet - Set of ISO date strings for absences.
+         * @param {Set<string>} certificatesSet - Set of ISO date strings for certificates.
+         * @returns {{effectiveDays: number, absenceDaysCount: number, certificateDaysCount: number, holidaysInPeriod: Array<Object>}} Counts and holidays.
          */
-        function calculateEffectiveDays() {
-            const startDate = new Date(startDateInput.value + 'T00:00:00');
-            const endDate = new Date(endDateInput.value + 'T00:00:00');
-
-            // Validation: Selected period must be within the same month
-            if (isNaN(startDate) || isNaN(endDate) || startDate > endDate) {
-                workingDaysInfoEl.textContent = "0";
-                holidaysInPeriodEl.textContent = "Nenhum";
-                calculatedWorkingDays = 0;
-                holidaysFoundInPeriod = [];
-                return { effectiveDays: 0, absenceDaysCount: 0, certificateDaysCount: 0 };
-            }
-            
-            if (startDate.getMonth() !== endDate.getMonth() || startDate.getFullYear() !== endDate.getFullYear()) {
-                showMessageModal("Erro de Período", "O período selecionado deve estar contido no mesmo mês.");
-                workingDaysInfoEl.textContent = "0";
-                holidaysInPeriodEl.textContent = "Nenhum";
-                calculatedWorkingDays = 0;
-                holidaysFoundInPeriod = [];
-                return { effectiveDays: 0, absenceDaysCount: 0, certificateDaysCount: 0 };
-            }
-
-            let count = 0; // Effective working days
-            let absenceCount = 0; // Count of absences
-            let certificateCount = 0; // Count of certificates
-            holidaysFoundInPeriod = []; // Reset list of holidays found
+        function calculateDaysForPeriod(startDate, endDate, absencesSet, certificatesSet) {
+            let count = 0;
+            let absenceCount = 0;
+            let certificateCount = 0;
+            let currentHolidaysInPeriod = [];
             const currentDate = new Date(startDate);
 
-            // Itera sobre cada dia no período
             while (currentDate <= endDate) {
                 const dayOfWeek = currentDate.getDay();
-                const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6); // 0 = Domingo, 6 = Sábado
+                const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
                 
                 const isoDateString = currentDate.toISOString().split('T')[0];
                 const holiday = holidays2025.find(h => h.date === isoDateString);
                 const isHoliday = holiday !== undefined;
 
-                const isAbsenceDay = selectedAbsenceDates.has(isoDateString);
-                const isCertificateDay = selectedCertificateDates.has(isoDateString);
+                const isAbsenceDay = absencesSet.has(isoDateString);
+                const isCertificateDay = certificatesSet.has(isoDateString);
 
-                // If it's not a weekend and not a holiday
                 if (!isWeekend && !isHoliday) {
                     if (!isAbsenceDay && !isCertificateDay) {
-                        count++; // É um dia útil efetivo
+                        count++;
                     } else {
                         if (isAbsenceDay) absenceCount++;
                         if (isCertificateDay) certificateCount++;
                     }
                 } else if (isHoliday) {
-                    holidaysFoundInPeriod.push(holiday); // Adiciona o feriado à lista
+                    currentHolidaysInPeriod.push(holiday);
                 }
-                currentDate.setDate(currentDate.getDate() + 1); // Avança para o próximo dia
+                currentDate.setDate(currentDate.getDate() + 1);
             }
-            calculatedWorkingDays = count;
-            workingDaysInfoEl.textContent = calculatedWorkingDays;
-            
-            // Atualiza a exibição dos feriados no período na barra lateral
-            if (holidaysFoundInPeriod.length > 0) {
-                holidaysInPeriodEl.textContent = holidaysFoundInPeriod.map(h => `${formatDate(h.date)} (${h.name})`).join(', ');
-            } else {
-                holidaysInPeriodEl.textContent = "Nenhum";
-            }
-
-            return { effectiveDays: calculatedWorkingDays, absenceDaysCount: absenceCount, certificateDaysCount: certificateCount };
+            return { effectiveDays: count, absenceDaysCount: absenceCount, certificateDaysCount: certificateCount, holidaysInPeriod: currentHolidaysInPeriod };
         }
         
         /**
+         * Filters a global set of marked dates (absences or certificates) to find those within a specific month.
+         * @param {Set<string>} globalMarkedDatesSet - The global Set of all marked dates.
+         * @param {number} year - The year of the target month.
+         * @param {number} monthIndex - The 0-indexed month (0-11) of the target month.
+         * @returns {Set<string>} A new Set containing only dates from the specified month.
+         */
+        function getMarkedDatesInSpecificMonth(globalMarkedDatesSet, year, monthIndex) {
+            const startOfMonth = new Date(year, monthIndex, 1);
+            const endOfMonth = new Date(year, monthIndex + 1, 0);
+            const filteredDates = Array.from(globalMarkedDatesSet).filter(dateString => {
+                const date = new Date(dateString + 'T00:00:00'); // Ensure date is treated as local time
+                return date >= startOfMonth && date <= endOfMonth;
+            });
+            return new Set(filteredDates);
+        }
+
+        /**
          * Handles the change of the selected receipt type.
-         * Shows/hides relevant input fields based on the type.
+         * Updates calendar display and marking period, then refreshes receipt display.
          */
         function handleReceiptTypeChange() {
             selectedReceiptType = document.querySelector('input[name="receiptType"]:checked').value;
@@ -770,13 +762,47 @@
             // Hide intern period container by default
             internPeriodContainerEl.classList.add('hidden');
             
-            // Show relevant container based on selected type
+            const mainPeriodStartDate = startDateInput.value ? new Date(startDateInput.value + 'T00:00:00') : null;
+            const mainPeriodEndDate = endDateInput.value ? new Date(endDateInput.value + 'T00:00:00') : null;
+
             if (selectedReceiptType === 'salarioEstagiario') {
                 internPeriodContainerEl.classList.remove('hidden');
             }
 
-            // Recalculate days if dates are already set
-            calculateEffectiveDays();
+            // Toggle visibility of "Calcular Dias" button and period info based on receipt type
+            if (selectedReceiptType === 'valeTransporte' || selectedReceiptType === 'salarioEstagiario' || selectedReceiptType === 'bonificacao') {
+                calculateDaysButtonContainerEl.classList.add('hidden');
+                periodInfoContainerEl.classList.add('hidden');
+            } else { 
+                calculateDaysButtonContainerEl.classList.remove('hidden');
+                periodInfoContainerEl.classList.remove('hidden');
+            }
+
+
+            // Adjust calendar display and marking period based on receipt type
+            if (selectedReceiptType === 'valeTransporte' && mainPeriodStartDate) {
+                // For Vale Transporte, calendar shows previous month, and only allows marking there
+                const prevMonthDate = new Date(mainPeriodStartDate.getFullYear(), mainPeriodStartDate.getMonth() - 1, 1);
+                currentCalendarMonth = prevMonthDate.getMonth();
+                currentCalendarYear = prevMonthDate.getFullYear();
+                calendarMarkablePeriod.start = prevMonthDate;
+                calendarMarkablePeriod.end = new Date(mainPeriodStartDate.getFullYear(), mainPeriodStartDate.getMonth(), 0); // Last day of previous month
+            } else if (mainPeriodStartDate && mainPeriodEndDate) {
+                // For other types, calendar shows current selected period, and allows marking within it
+                currentCalendarMonth = mainPeriodStartDate.getMonth();
+                currentCalendarYear = mainPeriodStartDate.getFullYear();
+                calendarMarkablePeriod.start = mainPeriodStartDate;
+                calendarMarkablePeriod.end = mainPeriodEndDate;
+            } else {
+                // No valid dates selected, disable marking
+                currentCalendarMonth = new Date().getMonth(); // Default to current month for display
+                currentCalendarYear = new Date().getFullYear();
+                calendarMarkablePeriod.start = null;
+                calendarMarkablePeriod.end = null;
+            }
+
+            renderCalendar(); // Re-render calendar with new settings
+            updateReceiptDisplay(); // Update receipt content
         }
 
         /**
@@ -867,11 +893,9 @@
             const today = new Date();
             currentCalendarMonth = today.getMonth();
             currentCalendarYear = today.getFullYear();
-            renderCalendar(); // Re-render calendar to remove visual markings
-
-            // Reset receipt type to Vale Transporte
-            document.querySelector('input[name="receiptType"][value="valeTransporte"]').checked = true;
-            handleReceiptTypeChange(); // Call to update interface with default receipt type
+            
+            // Re-evaluate calendarMarkablePeriod based on the default receipt type and new employee selection
+            handleReceiptTypeChange(); // This will also call renderCalendar and updateReceiptDisplay
 
             // Hide receipt content and show welcome message
             receiptContentEl.classList.add('hidden');
@@ -967,8 +991,12 @@
                 return;
             }
 
-            // Recalculate effective days before showing the modal to have the latest values
-            const { effectiveDays, absenceDaysCount, certificateDaysCount } = calculateEffectiveDays();
+            // Ensure the receipt display is updated just before confirmation to get latest values
+            updateReceiptDisplay();
+
+            const { effectiveDays, absenceDaysCount, certificateDaysCount } = 
+                calculateDaysForPeriod(new Date(startDateInput.value + 'T00:00:00'), new Date(endDateInput.value + 'T00:00:00'), selectedAbsenceDates, selectedCertificateDates);
+
 
             // Check if the period is valid before showing the modal
             const startDate = new Date(startDateInput.value + 'T00:00:00');
@@ -978,17 +1006,43 @@
                 return;
             }
             
-            // Do not generate bonus if there's an absence or certificate
-            if (selectedReceiptType === 'bonificacao' && (absenceDaysCount > 0 || certificateDaysCount > 0)) {
-                showMessageModal("Erro de Bonificação", "Não é possível gerar o recibo de bonificação devido a falta ou atestado.");
-                return;
+            // For Bonificação, we now generate with 0 if there's absence/certificate, so no early return here.
+            // Check for other types: if selectedReceiptType is not VT and not Bonificação, and effectiveDays is 0, show error.
+            if (selectedReceiptType !== 'valeTransporte' && selectedReceiptType !== 'bonificacao' && effectiveDays <= 0) { 
+                 showMessageModal("Erro de Dias Úteis", "O período selecionado não resultou em dias úteis efetivos. Verifique as datas, feriados, faltas e atestados.");
+                 return;
             }
 
-            if (effectiveDays <= 0 && selectedReceiptType !== 'bonificacao') { // Bonus can be 0 due to absences
-                showMessageModal("Erro de Dias Úteis", "O período selecionado não resultou em dias úteis efetivos. Verifique as datas, feriados, faltas e atestados.");
-                return;
+            // For Vale Transporte, check previous month absences for confirmation logic
+            if (selectedReceiptType === 'valeTransporte') {
+                const currentMonthStartDate = new Date(startDateInput.value + 'T00:00:00');
+                const currentMonthEndDate = new Date(endDateInput.value + 'T00:00:00');
+
+                let totalPossibleWorkingDaysInCurrentMonth = 0;
+                const tempDate = new Date(currentMonthStartDate);
+                while (tempDate <= currentMonthEndDate) {
+                    const dayOfWeek = tempDate.getDay();
+                    const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
+                    const isoDateString = tempDate.toISOString().split('T')[0];
+                    const isHoliday = holidays2025.some(h => h.date === isoDateString);
+                    if (!isWeekend && !isHoliday) {
+                        totalPossibleWorkingDaysInCurrentMonth++;
+                    }
+                    tempDate.setDate(tempDate.getDate() + 1);
+                }
+
+                const prevMonthStartDateForCalc = new Date(currentMonthStartDate.getFullYear(), currentMonthStartDate.getMonth() - 1, 1);
+                const prevMonthAbsencesForCalc = getMarkedDatesInSpecificMonth(selectedAbsenceDates, prevMonthStartDateForCalc.getFullYear(), prevMonthStartDateForCalc.getMonth());
+                const prevMonthCertificatesForCalc = getMarkedDatesInSpecificMonth(selectedCertificateDates, prevMonthStartDateForCalc.getFullYear(), prevMonthStartDateForCalc.getMonth());
+
+                const effectiveDaysForVTConfirm = totalPossibleWorkingDaysInCurrentMonth - (prevMonthAbsencesForCalc.size + prevMonthCertificatesForCalc.size);
+
+                if (effectiveDaysForVTConfirm <= 0) {
+                    showMessageModal("Erro de Dias Úteis", "O período selecionado para Vale Transporte não resultou em dias úteis efetivos, considerando as faltas e atestados do mês anterior.");
+                    return;
+                }
             }
-            
+
             modalEmployeeNameEl.textContent = `Gerar recibo para ${selectedEmployeeForReceipt.nome}?`;
             confirmationModalEl.classList.remove('hidden');
         }
@@ -1032,33 +1086,152 @@
         }
 
         /**
-         * Generates the receipt based on the selected employee and calculated working days.
-         * @param {object} employee - The selected employee object.
+         * Updates the receipt display based on selected employee and receipt type.
          */
-        function generateReceipt(employee) {
+        function updateReceiptDisplay() {
+            if (!selectedEmployeeForReceipt) {
+                receiptContentEl.classList.add('hidden');
+                welcomeMessageEl.classList.remove('hidden');
+                return;
+            }
+
             welcomeMessageEl.classList.add('hidden');
             receiptContentEl.classList.remove('hidden');
             
-            currentReceiptNumber++; // This should ideally be fetched/managed from a persistent source
-            let totalValue = 0; 
-            const { effectiveDays, absenceDaysCount, certificateDaysCount } = calculateEffectiveDays();
+            // Set the receipt date at the top
+            receiptDateTopEl.textContent = getCurrentDateFormatted();
 
-            let receiptDescriptionText = "";
-            let receiptTitleText = "Recibo"; // Changed to simply "Recibo"
+
+            let totalValue = 0; 
+            let periodText = '';
+            let totalWordsLabelText = 'Valor total à receber:'; // Default for new requirements, includes accent
+            let dailyValueHtml = '';
+            let additionalInfo = ''; // For holidays, absences, certificates info
+
+            const receiptPeriodStartDate = new Date(startDateInput.value + 'T00:00:00');
+            const receiptPeriodEndDate = new Date(endDateInput.value + 'T00:00:00');
+            const monthNames = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
+            const receiptPeriodMonthName = monthNames[receiptPeriodStartDate.getMonth()];
+
+            // Calculate days for the MAIN RECEIPT PERIOD (current month's inputs)
+            const { effectiveDays, absenceDaysCount, certificateDaysCount, holidaysInPeriod } = 
+                calculateDaysForPeriod(receiptPeriodStartDate, receiptPeriodEndDate, selectedAbsenceDates, selectedCertificateDates);
+            
+            // Always show holidays for the main receipt period
+            if (holidaysInPeriod.length > 0) {
+                additionalInfo += `<strong>Feriado(s) no período:</strong><br>${holidaysInPeriod.map(h => `- ${formatDate(h.date)}: ${h.name}`).join('<br>')}`;
+            }
 
             if (selectedReceiptType === 'valeTransporte') {
-                totalValue = effectiveDays * receiptBaseDetails.dailyValue;
-                receiptDescriptionText = "REFERENTE AO VALE TRANSPORTE";
+                // Calculate previous month's dates for absences/certificates affecting VT
+                const prevMonthStartDate = new Date(receiptPeriodStartDate.getFullYear(), receiptPeriodStartDate.getMonth() - 1, 1);
+                const prevMonthEndDate = new Date(receiptPeriodStartDate.getFullYear(), receiptPeriodStartDate.getMonth(), 0);
+
+                // Get absences and certificates from the previous month's markings
+                const prevMonthAbsences = getMarkedDatesInSpecificMonth(selectedAbsenceDates, prevMonthStartDate.getFullYear(), prevMonthStartDate.getMonth());
+                const prevMonthCertificates = getMarkedDatesInSpecificMonth(selectedCertificateDates, prevMonthStartDate.getFullYear(), prevMonthStartDate.getMonth());
+
+                // Calculate total possible working days in the *current* receipt month (without current month's marked absences/certs)
+                let totalPossibleWorkingDaysInCurrentMonth = 0;
+                const tempDate = new Date(receiptPeriodStartDate);
+                while (tempDate <= receiptPeriodEndDate) {
+                    const dayOfWeek = tempDate.getDay();
+                    const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
+                    const isoDateString = tempDate.toISOString().split('T')[0];
+                    const isHoliday = holidays2025.some(h => h.date === isoDateString);
+                    if (!isWeekend && !isHoliday) {
+                        totalPossibleWorkingDaysInCurrentMonth++;
+                    }
+                    tempDate.setDate(tempDate.getDate() + 1);
+                }
+                
+                // --- NEW CALCULATION FOR VALE TRANSPORTE ---
+                // Pegar o periodo selecionado multiplicar por 8,6
+                let baseValue = totalPossibleWorkingDaysInCurrentMonth * receiptBaseDetails.dailyValue;
+                // Cada atestado e/ou falta subtrair 8,6 do resultado da multiplicação dos dias uteis selecionado por 8,6.
+                let deduction = (prevMonthAbsences.size + prevMonthCertificates.size) * receiptBaseDetails.dailyValue;
+                totalValue = baseValue - deduction;
+                // --- END NEW CALCULATION ---
+
+                document.getElementById('receipt-description').textContent = "REFERENTE AO VALE TRANSPORTE";
+                
+                // --- Updated Period Text for Vale Transporte ---
+                periodText = `<strong>Período:</strong> ${totalPossibleWorkingDaysInCurrentMonth} dias úteis efetivos do mês de ${receiptPeriodMonthName} (${formatDate(startDateInput.value)} até ${formatDate(endDateInput.value)}).`;
+                // --- End Updated Period Text ---
+
+                dailyValueHtml = `<strong>Valor Diário:</strong> ${formatCurrency(receiptBaseDetails.dailyValue)} (${numberToWords(receiptBaseDetails.dailyValue)})`;
+                
+                // Get previous month's name for description
+                const prevMonthNameForDisplay = monthNames[prevMonthStartDate.getMonth()];
+
+                // List previous month absences/certs in additionalInfo using previous month's name
+                if (prevMonthAbsences.size > 0) {
+                    additionalInfo += (additionalInfo ? '<br><br>' : '') + `<strong>Falta(s) referente(s) ao mês de ${prevMonthNameForDisplay}:</strong><br>${Array.from(prevMonthAbsences).sort().map(d => `- ${formatDate(d)}`).join('<br>')}`;
+                }
+                if (prevMonthCertificates.size > 0) {
+                    additionalInfo += (additionalInfo ? '<br><br>' : '') + `<strong>Atestado(s) referente(s) ao mês de ${prevMonthNameForDisplay}:</strong><br>${Array.from(prevMonthCertificates).sort().map(d => `- ${formatDate(d)}`).join('<br>')}`;
+                }
+                totalWordsLabelText = 'Valor total à receber:'; // Specific for VT
+
             } else if (selectedReceiptType === 'salarioEstagiario') {
                 const monthlyAllowance = receiptBaseDetails.monthlyAllowance;
-                const standardWorkingDaysPerMonth = 22; 
-                const dailyAllowance = monthlyAllowance / standardWorkingDaysPerMonth;
-                totalValue = monthlyAllowance - (absenceDaysCount * dailyAllowance); // Only subtract absences
-                receiptDescriptionText = `REFERENTE À BOLSA ESTÁGIO (${internPeriodSelectEl.value === 'matutino' ? 'Período Matutino' : 'Período Vespertino'})`;
+                const fixedDivisorForAbsence = 30; // Always divide by 30 for salary discount
+                const dailyAllowance = monthlyAllowance / fixedDivisorForAbsence;
+                totalValue = monthlyAllowance - (absenceDaysCount * dailyAllowance); // absenceDaysCount are for current period
+                document.getElementById('receipt-description').textContent = `REFERENTE À BOLSA ESTÁGIO (${internPeriodSelectEl.value === 'matutino' ? 'Período Matutino' : 'Período Vespertino'})`;
+                
+                // --- Updated Period Text for Salário Estagiário (with selected period type) ---
+                const internPeriodDisplay = internPeriodSelectEl.value === 'matutino' ? 'Matutino' : 'Vespertino';
+                periodText = `<strong>Período:</strong> dias trabalhados do mês de ${receiptPeriodMonthName} (${internPeriodDisplay}) (${formatDate(startDateInput.value)} até ${formatDate(endDateInput.value)}).`;
+                // --- End Updated Period Text ---
+                
+                dailyValueHtml = `<strong>Valor Fixo Mensal:</strong> ${formatCurrency(receiptBaseDetails.monthlyAllowance)} (${numberToWords(receiptBaseDetails.monthlyAllowance)})`;
+                totalWordsLabelText = 'Valor Total à receber:'; // Specific for Salário Estagiário
+
+                // List current period absences/certs in additionalInfo
+                if (absenceDaysCount > 0) {
+                    additionalInfo += (additionalInfo ? '<br><br>' : '') + `<strong>Dia(s) de Falta:</strong><br>${Array.from(selectedAbsenceDates).filter(d => {
+                        const date = new Date(d + 'T00:00:00');
+                        return date >= receiptPeriodStartDate && date <= receiptPeriodEndDate;
+                    }).sort().map(d => `- ${formatDate(d)}`).join('<br>')}`;
+                }
+                if (certificateDaysCount > 0) {
+                    additionalInfo += (additionalInfo ? '<br><br>' : '') + `<strong>Dia(s) de Atestado:</strong><br>${Array.from(selectedCertificateDates).filter(d => {
+                        const date = new Date(d + 'T00:00:00');
+                        return date >= receiptPeriodStartDate && date <= receiptPeriodEndDate;
+                    }).sort().map(d => `- ${formatDate(d)}`).join('<br>')}`;
+                }
+
             } else if (selectedReceiptType === 'bonificacao') {
-                const bonusAmount = receiptBaseDetails.fixedBonusAmount; 
-                totalValue = bonusAmount;
-                receiptDescriptionText = `REFERENTE À BONIFICAÇÃO`;
+                // --- NEW LOGIC for Bonificação: Value is 0 if there are absences/certificates ---
+                if (absenceDaysCount > 0 || certificateDaysCount > 0) {
+                    totalValue = 0; // Set to zero if there's any absence or certificate in the current period
+                } else {
+                    totalValue = receiptBaseDetails.fixedBonusAmount; 
+                }
+                // --- END NEW LOGIC ---
+
+                document.getElementById('receipt-description').textContent = `REFERENTE À BONIFICAÇÃO`;
+                
+                // Period Text for Bonificação (original format) - NO DIAS ÚTEIS EFETIVOS
+                periodText = `<strong>Período:</strong> dias trabalhados do mês de ${receiptPeriodMonthName} (${formatDate(startDateInput.value)} até ${formatDate(endDateInput.value)}).`;
+                
+                dailyValueHtml = `<strong>Valor Fixo Mensal:</strong> ${formatCurrency(receiptBaseDetails.fixedBonusAmount)} (${numberToWords(receiptBaseDetails.fixedBonusAmount)})`; 
+                totalWordsLabelText = 'Valor total à receber:'; // Specific for Bonificação
+                
+                // List current period absences/certs in additionalInfo
+                if (absenceDaysCount > 0) {
+                    additionalInfo += (additionalInfo ? '<br><br>' : '') + `<strong>Dia(s) de Falta:</strong><br>${Array.from(selectedAbsenceDates).filter(d => {
+                        const date = new Date(d + 'T00:00:00');
+                        return date >= receiptPeriodStartDate && date <= receiptPeriodEndDate;
+                    }).sort().map(d => `- ${formatDate(d)}`).join('<br>')}`;
+                }
+                if (certificateDaysCount > 0) {
+                    additionalInfo += (additionalInfo ? '<br><br>' : '') + `<strong>Dia(s) de Atestado:</strong><br>${Array.from(selectedCertificateDates).filter(d => {
+                        const date = new Date(d + 'T00:00:00');
+                        return date >= receiptPeriodStartDate && date <= receiptPeriodEndDate;
+                    }).sort().map(d => `- ${formatDate(d)}`).join('<br>')}`;
+                }
             }
 
             let words;
@@ -1069,111 +1242,63 @@
                 words = "Erro na conversão"; 
             }
 
-            receiptTitleEl.textContent = receiptTitleText; 
-            document.getElementById('receipt-id').textContent = currentReceiptNumber;
+            // Update receipt elements
             document.getElementById('receipt-total').textContent = formatCurrency(totalValue);
             document.getElementById('receipt-payer').textContent = receiptBaseDetails.payer;
             document.getElementById('receipt-cnpj').textContent = `CNPJ: ${receiptBaseDetails.cnpj}`;
-            document.getElementById('employee-name').textContent = employee.nome;
-            document.getElementById('employee-cpf').textContent = employee.cpf;
-            document.getElementById('receipt-description').textContent = receiptDescriptionText;
+            document.getElementById('employee-name').textContent = selectedEmployeeForReceipt.nome;
+            document.getElementById('employee-cpf').textContent = selectedEmployeeForReceipt.cpf;
             
-            // Get month name for period text
-            const startDateObj = new Date(startDateInput.value + 'T00:00:00');
-            const monthNames = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
-            const monthName = monthNames[startDateObj.getMonth()];
-
-            // Updated Period Text to include effectiveDays
-            const periodText = `<strong>Período:</strong> ${effectiveDays} dias trabalhados do mês de ${monthName} (${formatDate(startDateInput.value)} até ${formatDate(endDateInput.value)}).`;
             document.getElementById('receipt-period-info').innerHTML = periodText;
-            
-            let dailyValueHtml = '';
-            if (selectedReceiptType === 'valeTransporte') {
-                dailyValueHtml = `<strong>Valor Diário:</strong> ${formatCurrency(receiptBaseDetails.dailyValue)} (${numberToWords(receiptBaseDetails.dailyValue)})`;
-            } else if (selectedReceiptType === 'salarioEstagiario') {
-                dailyValueHtml = `<strong>Valor Fixo Mensal:</strong> ${formatCurrency(receiptBaseDetails.monthlyAllowance)} (${numberToWords(receiptBaseDetails.monthlyAllowance)})`;
-            } else if (selectedReceiptType === 'bonificacao') {
-                dailyValueHtml = `<strong>Valor Fixo Mensal:</strong> ${formatCurrency(receiptBaseDetails.fixedBonusAmount)} (${numberToWords(receiptBaseDetails.fixedBonusAmount)})`;
-            }
             document.getElementById('receipt-daily-value').innerHTML = dailyValueHtml;
-            
+            document.getElementById('receipt-holidays-info').innerHTML = additionalInfo;
 
-            const holidaysInfoEl = document.getElementById('receipt-holidays-info');
-            let additionalInfo = '';
-            if (holidaysFoundInPeriod.length > 0) {
-                additionalInfo += `<strong>Feriado(s) no período:</strong><br>${holidaysFoundInPeriod.map(h => `- ${formatDate(h.date)}: ${h.name}`).join('<br>')}`;
-            }
-            if (selectedAbsenceDates.size > 0) {
-                const sortedAbsenceDates = Array.from(selectedAbsenceDates).sort();
-                additionalInfo += (additionalInfo ? '<br><br>' : '') + `<strong>Dia(s) de Falta:</strong><br>${sortedAbsenceDates.map(d => `- ${formatDate(d)}`).join('<br>')}`;
-            }
-            if (selectedCertificateDates.size > 0) {
-                const sortedCertificateDates = Array.from(selectedCertificateDates).sort();
-                additionalInfo += (additionalInfo ? '<br><br>' : '') + `<strong>Dia(s) de Atestado:</strong><br>${sortedCertificateDates.map(d => `- ${formatDate(d)}`).join('<br>')}`;
-            }
-            holidaysInfoEl.innerHTML = additionalInfo;
-
+            document.getElementById('receipt-total-words-label').textContent = totalWordsLabelText;
             document.getElementById('receipt-total-words').textContent = words; 
-            document.getElementById('employee-signature-name').textContent = employee.nome;
-            document.getElementById('receipt-location-date').innerHTML = `${receiptBaseDetails.location}, <span id="current-date-receipt">${getCurrentDateFormatted()}</span>.`;
+            document.getElementById('employee-signature-name').textContent = selectedEmployeeForReceipt.nome;
+            // Removed receipt-location-date update
+
+            // Removed chart update call
+            // updateChart(selectedEmployeeForReceipt, totalValue); 
             
-            // The chart is now hidden by CSS for print, so no need to explicitly update it for print purposes.
-            // It will still update for screen display.
-            updateChart(employee, totalValue); 
+            // --- Update Receipt Titles ---
+            if (selectedReceiptType === 'valeTransporte') {
+                receiptTitleEl.textContent = "Recibo de vale transporte";
+            } else if (selectedReceiptType === 'salarioEstagiario') {
+                receiptTitleEl.textContent = "Recibo Bolsa Estágio";
+            } else if (selectedReceiptType === 'bonificacao') {
+                receiptTitleEl.textContent = "Recibo de bonificação";
+            } else {
+                receiptTitleEl.textContent = "Recibo"; // Default fallback
+            }
+            // --- End Update Receipt Titles ---
         }
 
-        /**
-         * Updates the payment comparison chart.
-         * @param {object} selectedEmployee - The currently selected employee.
-         * @param {number} currentTotal - The total payment for the selected employee.
-         */
+        // Removed the updateChart function as it's no longer used.
+        /*
         function updateChart(selectedEmployee, currentTotal) {
-            const ctx = document.getElementById('paymentChart').getContext('2d');
-            const averagePayment = 175.50; // Example fixed average payment
+            // ... (removed chart logic)
+        }
+        */
+        
+        /**
+         * Exports employee data to a plain text file for download.
+         */
+        function exportEmployeesToTxt() {
+            let csvContent = "Nome,CPF\n"; // Header row
+            employeeData.forEach(employee => {
+                csvContent += `${employee.nome},${employee.cpf}\n`;
+            });
 
-            const data = {
-                labels: [selectedEmployee.nome, 'Média Geral (Exemplo)'],
-                datasets: [{
-                    label: 'Valor do Pagamento (R$)',
-                    data: [currentTotal, averagePayment],
-                    backgroundColor: [
-                        'rgba(13, 148, 136, 0.6)', 
-                        'rgba(120, 113, 108, 0.6)' 
-                    ],
-                    borderColor: [
-                        'rgb(13, 148, 136)',
-                        'rgb(120, 113, 108)'
-                    ],
-                    borderWidth: 2
-                }]
-            };
-
-            const options = {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { display: false },
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                let label = context.dataset.label || '';
-                                if (label) { label += ': '; }
-                                if (context.parsed.y !== null) { label += formatCurrency(context.parsed.y); }
-                                return label;
-                            }
-                        }
-                    }
-                },
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        ticks: { callback: function(value) { return 'R$ ' + value; } }
-                    }
-                }
-            };
-            
-            if (paymentChart) { paymentChart.destroy(); }
-            paymentChart = new Chart(ctx, { type: 'bar', data: data, options: options });
+            const blob = new Blob([csvContent], { type: 'text/plain;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'funcionarias.txt'; // Suggested filename
+            document.body.appendChild(link); // Required for Firefox
+            link.click(); // Trigger download
+            document.body.removeChild(link); // Clean up
+            URL.revokeObjectURL(link.href); // Release object URL
+            showMessageModal("Exportação Concluída", "Os dados das funcionárias foram exportados para 'funcionarias.txt'. Você pode encontrar o arquivo na sua pasta de downloads.");
         }
         
         // Initialize the app on window load
@@ -1188,52 +1313,63 @@
             workingDaysInfoEl = document.getElementById('workingDaysInfo');
             calculateDaysButtonEl = document.getElementById('calculateDaysButton');
             holidaysInPeriodEl = document.getElementById('holidaysInPeriod');
+            calculateDaysButtonContainerEl = document.getElementById('calculateDaysButtonContainer'); 
+            periodInfoContainerEl = document.getElementById('periodInfoContainer'); 
+            
             confirmationModalEl = document.getElementById('confirmationModal');
             modalEmployeeNameEl = document.getElementById('modalEmployeeName');
             confirmButtonEl = document.getElementById('confirmButton');
             cancelButtonEl = document.getElementById('cancelButton');
+
             receiptTypeSelectionEl = document.getElementById('receiptTypeSelection');
             internPeriodContainerEl = document.getElementById('internPeriodContainer');
             internPeriodSelectEl = document.getElementById('internPeriod');
             receiptTitleEl = document.getElementById('receipt-title');
+            receiptDateTopEl = document.getElementById('receipt-date-top'); 
+
+            // Elementos do calendário
             calendarEl = document.getElementById('calendar');
             currentMonthYearEl = document.getElementById('currentMonthYear');
             prevMonthBtn = document.getElementById('prevMonth');
             nextMonthBtn = document.getElementById('nextMonth');
             clearMarkingButton = document.getElementById('clearMarkingButton');
             generateReceiptButton = document.getElementById('generateReceiptButton');
+
+            // Elementos do novo modal de mensagem
             messageModalEl = document.getElementById('messageModal');
-            messageModalTitleEl = document.getElementById('messageModalTitle');
+            messageModalTitleEl = document.getElementById('messageModalTitle'); 
             messageModalContentEl = document.getElementById('messageModalContent');
             messageModalCloseButton = document.getElementById('messageModalCloseButton');
+
+            // Elementos para adicionar/remover funcionárias
             newEmployeeNameInput = document.getElementById('newEmployeeName');
             newEmployeeCpfInput = document.getElementById('newEmployeeCpf');
             addEmployeeButton = document.getElementById('addEmployeeButton');
+            exportEmployeesButton = document.getElementById('exportEmployeesButton'); 
+
+            // Elementos do novo modal de confirmação de exclusão
             deleteConfirmationModalEl = document.getElementById('deleteConfirmationModal');
             deleteEmployeeNameEl = document.getElementById('deleteEmployeeName');
             cancelDeleteButton = document.getElementById('cancelDeleteButton');
-            confirmDeleteButton = document.getElementById('confirmDeleteButton'); // Corrected ID
+            confirmDeleteButton = document.getElementById('confirmDeleteButton'); 
 
             // Event listener attachments - moved inside window.onload
             searchInputEl.addEventListener('keyup', (e) => renderEmployeeList(e.target.value));
             startDateInput.addEventListener('change', () => {
-                if (startDateInput.value) {
-                    const date = new Date(startDateInput.value);
-                    currentCalendarMonth = date.getMonth();
-                    currentCalendarYear = date.getFullYear();
-                }
+                // Clear existing markings if the main period changes, as their relevance might shift
                 selectedAbsenceDates.clear(); 
                 selectedCertificateDates.clear(); 
-                renderCalendar();
-                calculateEffectiveDays();
+                // Then update the calendar and receipt display based on new dates and current receipt type
+                handleReceiptTypeChange(); // This will handle calendar month/year and marking period update
             });
             endDateInput.addEventListener('change', () => {
+                // Clear existing markings if the main period changes, as their relevance might shift
                 selectedAbsenceDates.clear(); 
                 selectedCertificateDates.clear(); 
-                renderCalendar();
-                calculateEffectiveDays();
+                // Then update the calendar and receipt display based on new dates and current receipt type
+                handleReceiptTypeChange(); // This will handle calendar month/year and marking period update
             });
-            calculateDaysButtonEl.addEventListener('click', calculateEffectiveDays);
+            calculateDaysButtonEl.addEventListener('click', updateReceiptDisplay); // Changed to updateReceiptDisplay
             document.querySelectorAll('input[name="receiptType"]').forEach(radio => {
                 radio.addEventListener('change', handleReceiptTypeChange);
             });
@@ -1262,15 +1398,16 @@
                 selectedAbsenceDates.clear();
                 selectedCertificateDates.clear();
                 renderCalendar();
-                calculateEffectiveDays();
+                updateReceiptDisplay(); // Update receipt after clearing
                 showMessageModal("Marcações Limpas", "Todas as marcações de falta e atestado foram limpas.");
             });
             generateReceiptButton.addEventListener('click', showConfirmationModal);
             newEmployeeCpfInput.addEventListener('input', formatCpfInput);
             addEmployeeButton.addEventListener('click', addEmployee);
+            exportEmployeesButton.addEventListener('click', exportEmployeesToTxt); // Attach export listener
             confirmButtonEl.addEventListener('click', () => {
                 if (selectedEmployeeForReceipt) {
-                    generateReceipt(selectedEmployeeForReceipt);
+                    updateReceiptDisplay(); // Final update on confirm
                 }
                 hideConfirmationModal();
             });
@@ -1283,7 +1420,6 @@
             cancelDeleteButton.addEventListener('click', hideDeleteConfirmationModal);
 
             // Initial setup calls
-            document.getElementById('current-date-receipt').textContent = getCurrentDateFormatted();
             const today = new Date();
             const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
             const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
@@ -1292,9 +1428,8 @@
             endDateInput.value = lastDayOfMonth.toISOString().split('T')[0];
             
             renderEmployeeList(); // Initial render of the employee list
+            // Call handleReceiptTypeChange to correctly set up initial calendar state and receipt display
             handleReceiptTypeChange(); 
-            calculateEffectiveDays(); 
-            renderCalendar(); 
         };
 
     </script>
