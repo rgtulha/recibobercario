@@ -246,7 +246,7 @@
             </div>
 
             <div id="receipt-content" class="hidden">
-                <div class="flex justify-between items-start mb-8 no-print"> <!-- Added no-print class here -->
+                <div class="flex justify-between items-start mb-8"> <!-- Removed no-print from this div -->
                     <h2 id="receipt-title" class="text-4xl font-bold text-stone-800">Recibo</h2>
                     <button onclick="window.print()" class="no-print px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors flex items-center gap-2 shadow-md">
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
@@ -368,6 +368,9 @@
             { nome: "VERA LUCIA DE LEMOS PEREIRA DA CRUZ", cpf: "018.455.171-48" },
             { nome: "WATINA LORRAINE MARTINS", cpf: "058.233.501-98" }
         ];
+
+        // Sort employeeData alphabetically by nome
+        employeeData.sort((a, b) => a.nome.localeCompare(b.nome));
 
         // Detalhes base do recibo
         const receiptBaseDetails = {
@@ -811,7 +814,11 @@
          * @returns {string} The capitalized string.
          */
         function capitalizeWords(str) {
-            return str.replace(/\b\w/g, char => char.toUpperCase());
+            if (!str) return '';
+            return str.split(' ').map(word => {
+                if (word.length === 0) return '';
+                return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+            }).join(' ');
         }
 
         /**
@@ -820,7 +827,7 @@
          */
         function renderEmployeeList(filter = '') {
             employeeListEl.innerHTML = '';
-            const filteredData = employeeData.filter(emp => emp.nome.toLowerCase().includes(filter.toLowerCase()));
+            const filteredData = employeeData.filter(emp => formatEmployeeName(emp.nome).toLowerCase().includes(filter.toLowerCase()));
             
             if (filteredData.length === 0) {
                 employeeListEl.innerHTML = `<p class="text-stone-500 p-4 text-center">Nenhuma funcionária encontrada.</p>`;
@@ -831,7 +838,7 @@
                 const item = document.createElement('div');
                 item.className = 'p-3 mb-2 rounded-lg cursor-pointer hover:bg-teal-50 border-b border-stone-200 employee-item flex justify-between items-center';
                 item.innerHTML = `
-                    <span>${employee.nome}</span>
+                    <span>${formatEmployeeName(employee.nome)}</span>
                     <button class="text-red-500 hover:text-red-700 ml-2" data-cpf="${employee.cpf}" type="button">
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
                             <path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/>
@@ -851,7 +858,7 @@
                 const deleteButton = item.querySelector('button');
                 deleteButton.addEventListener('click', (event) => {
                     event.stopPropagation(); // Prevent employee selection when clicking delete
-                    showDeleteConfirmationModal(employee.cpf, employee.nome); // Pass CPF as ID for local array
+                    showDeleteConfirmationModal(employee.cpf, formatEmployeeName(employee.nome)); // Pass CPF as ID for local array
                 });
 
                 employeeListEl.appendChild(item);
@@ -863,6 +870,25 @@
                     currentSelectedEl.classList.add('selected');
                 }
             }
+        }
+
+        /**
+         * Formats a given name string by capitalizing the first letter of each word and lowercasing the rest.
+         * Used for consistent display of employee names.
+         * @param {string} name - The employee's full name.
+         * @returns {string} The formatted name.
+         */
+        function formatEmployeeName(name) {
+            if (!name) return '';
+            return name.split(' ').map(word => {
+                if (word.length === 0) return '';
+                // Handle common conjunctions/prepositions in Portuguese
+                const lowerWord = word.toLowerCase();
+                if (['de', 'da', 'do', 'dos', 'das', 'e', 'em', 'com', 'sem', 'para', 'por'].includes(lowerWord)) {
+                    return lowerWord;
+                }
+                return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+            }).join(' ');
         }
 
         /**
@@ -879,7 +905,7 @@
             // Add 'selected' class to the clicked employee
             element.classList.add('selected');
             selectedEmployeeForReceipt = employee;
-            showMessageModal("Funcionária Selecionada", `Funcionária selecionada: ${employee.nome}`);
+            showMessageModal("Funcionária Selecionada", `Funcionária selecionada: ${formatEmployeeName(employee.nome)}`);
 
             // Clear all fields when selecting a new employee
             startDateInput.value = '';
@@ -953,6 +979,8 @@
             const capitalizedName = capitalizeWords(name);
 
             employeeData.push({ nome: capitalizedName, cpf: cpf });
+            // Re-sort employeeData after adding a new employee
+            employeeData.sort((a, b) => a.nome.localeCompare(b.nome));
             renderEmployeeList(); // Re-render the list to show the new employee
             newEmployeeNameInput.value = '';
             newEmployeeCpfInput.value = '';
@@ -968,6 +996,7 @@
             employeeData = employeeData.filter(emp => emp.cpf !== employeeCpf);
             
             if (employeeData.length < initialLength) {
+                // No need to re-sort here, as filter maintains order.
                 renderEmployeeList(); // Re-render the list after removal
                 // If the removed employee was the selected one, clear selection
                 if (selectedEmployeeForReceipt && selectedEmployeeForReceipt.cpf === employeeCpf) {
@@ -1043,7 +1072,7 @@
                 }
             }
 
-            modalEmployeeNameEl.textContent = `Gerar recibo para ${selectedEmployeeForReceipt.nome}?`;
+            modalEmployeeNameEl.textContent = `Gerar recibo para ${formatEmployeeName(selectedEmployeeForReceipt.nome)}?`; // Format name in modal
             confirmationModalEl.classList.remove('hidden');
         }
 
@@ -1075,7 +1104,7 @@
          */
         function showDeleteConfirmationModal(employeeCpf, employeeName) {
             employeeToDeleteCpf = employeeCpf; // Store the CPF temporarily
-            deleteEmployeeNameEl.textContent = employeeName;
+            deleteEmployeeNameEl.textContent = employeeName; // Already formatted by renderEmployeeList
             deleteConfirmationModalEl.classList.remove('hidden');
         }
 
@@ -1145,19 +1174,17 @@
                     tempDate.setDate(tempDate.getDate() + 1);
                 }
                 
-                // --- NEW CALCULATION FOR VALE TRANSPORTE ---
-                // Pegar o periodo selecionado multiplicar por 8,6
+                // --- CALCULATION FOR VALE TRANSPORTE ---
                 let baseValue = totalPossibleWorkingDaysInCurrentMonth * receiptBaseDetails.dailyValue;
-                // Cada atestado e/ou falta subtrair 8,6 do resultado da multiplicação dos dias uteis selecionado por 8,6.
                 let deduction = (prevMonthAbsences.size + prevMonthCertificates.size) * receiptBaseDetails.dailyValue;
                 totalValue = baseValue - deduction;
-                // --- END NEW CALCULATION ---
+                // --- END CALCULATION ---
 
                 document.getElementById('receipt-description').textContent = "REFERENTE AO VALE TRANSPORTE";
                 
-                // --- Updated Period Text for Vale Transporte ---
+                // --- Period Text for Vale Transporte ---
                 periodText = `<strong>Período:</strong> ${totalPossibleWorkingDaysInCurrentMonth} dias úteis efetivos do mês de ${receiptPeriodMonthName} (${formatDate(startDateInput.value)} até ${formatDate(endDateInput.value)}).`;
-                // --- End Updated Period Text ---
+                // --- End Period Text ---
 
                 dailyValueHtml = `<strong>Valor Diário:</strong> ${formatCurrency(receiptBaseDetails.dailyValue)} (${numberToWords(receiptBaseDetails.dailyValue)})`;
                 
@@ -1180,7 +1207,7 @@
                 totalValue = monthlyAllowance - (absenceDaysCount * dailyAllowance); // absenceDaysCount are for current period
                 document.getElementById('receipt-description').textContent = `REFERENTE À BOLSA ESTÁGIO (${internPeriodSelectEl.value === 'matutino' ? 'Período Matutino' : 'Período Vespertino'})`;
                 
-                // --- Updated Period Text for Salário Estagiário (with selected period type) ---
+                // --- Period Text for Salário Estagiário (with selected period type) ---
                 const internPeriodDisplay = internPeriodSelectEl.value === 'matutino' ? 'Matutino' : 'Vespertino';
                 periodText = `<strong>Período:</strong> dias trabalhados do mês de ${receiptPeriodMonthName} (${internPeriodDisplay}) (${formatDate(startDateInput.value)} até ${formatDate(endDateInput.value)}).`;
                 // --- End Updated Period Text ---
@@ -1246,7 +1273,7 @@
             document.getElementById('receipt-total').textContent = formatCurrency(totalValue);
             document.getElementById('receipt-payer').textContent = receiptBaseDetails.payer;
             document.getElementById('receipt-cnpj').textContent = `CNPJ: ${receiptBaseDetails.cnpj}`;
-            document.getElementById('employee-name').textContent = selectedEmployeeForReceipt.nome;
+            document.getElementById('employee-name').textContent = formatEmployeeName(selectedEmployeeForReceipt.nome); // Formatted name
             document.getElementById('employee-cpf').textContent = selectedEmployeeForReceipt.cpf;
             
             document.getElementById('receipt-period-info').innerHTML = periodText;
@@ -1255,11 +1282,7 @@
 
             document.getElementById('receipt-total-words-label').textContent = totalWordsLabelText;
             document.getElementById('receipt-total-words').textContent = words; 
-            document.getElementById('employee-signature-name').textContent = selectedEmployeeForReceipt.nome;
-            // Removed receipt-location-date update
-
-            // Removed chart update call
-            // updateChart(selectedEmployeeForReceipt, totalValue); 
+            document.getElementById('employee-signature-name').textContent = formatEmployeeName(selectedEmployeeForReceipt.nome); // Formatted name
             
             // --- Update Receipt Titles ---
             if (selectedReceiptType === 'valeTransporte') {
@@ -1287,7 +1310,7 @@
         function exportEmployeesToTxt() {
             let csvContent = "Nome,CPF\n"; // Header row
             employeeData.forEach(employee => {
-                csvContent += `${employee.nome},${employee.cpf}\n`;
+                csvContent += `${formatEmployeeName(employee.nome)},${employee.cpf}\n`; // Format name for export
             });
 
             const blob = new Blob([csvContent], { type: 'text/plain;charset=utf-8;' });
