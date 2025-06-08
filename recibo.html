@@ -353,13 +353,13 @@
                 <button id="confirmDeleteButton" class="px-4 py-2 text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors shadow-md">Excluir</button>
             </div>
         </div>
-    </div>
+    </div >
 
     <script type="module">
         // Firebase SDKs - Imported via script tags in the head for global access
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, query, onSnapshot, doc, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, query, onSnapshot, doc, setDoc, deleteDoc, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Firebase global variables
         let app;
@@ -370,6 +370,7 @@
 
         // App ID and Firebase Config are provided by the Canvas environment
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        // The Firebase config comes from the environment, do NOT hardcode it here.
         const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
 
         // Default employee data, used if Firestore is empty or loading fails
@@ -424,59 +425,16 @@
             {date: "2025-12-25", name: "Natal"}
         ];
         
-        // Elementos do DOM
-        let employeeListEl;
-        let searchInputEl;
-        let welcomeMessageEl;
-        let receiptContentEl;
-        let startDateInput;
-        let endDateInput;
-        let workingDaysInfoEl;
-        let calculateDaysButtonEl;
-        let holidaysInPeriodEl;
-        let calculateDaysButtonContainerEl; 
-        let periodInfoContainerEl; 
-        
-        let confirmationModalEl;
-        let modalEmployeeNameEl;
-        let confirmButtonEl;
-        let cancelButtonEl;
-
-        let receiptTypeSelectionEl;
-        let internPeriodContainerEl;
-        let internPeriodSelectEl;
-        let receiptTitleEl;
-        let receiptDateTopEl; 
-        let userIdDisplayEl; // Re-added element for user ID display
-
-        // Elementos do calendário
-        let calendarEl;
-        let currentMonthYearEl;
-        let prevMonthBtn;
-        let nextMonthBtn;
-        let clearMarkingButton;
-        let generateReceiptButton;
-
-        // Elementos do novo modal de mensagem
-        let messageModalEl;
-        let messageModalTitleEl;
-        let messageModalContentEl;
-        let messageModalCloseButton;
-
-        // Elementos para adicionar/remover funcionárias
-        let newEmployeeNameInput;
-        let newEmployeeCpfInput;
-        let addEmployeeButton;
-        // Removed export and import buttons/file input as Firebase will handle persistence
-        // let exportEmployeesButton; 
-        // let importEmployeesButton; 
-        // let importEmployeesFile;  
-
-        // Elementos do novo modal de confirmação de exclusão
-        let deleteConfirmationModalEl;
-        let deleteEmployeeNameEl;
-        let cancelDeleteButton;
-        let confirmDeleteButton;
+        // GLOBAL DOM ELEMENT REFERENCES (will be assigned in window.onload)
+        // Declared here so functions can access them.
+        let employeeListEl, searchInputEl, welcomeMessageEl, receiptContentEl, startDateInput, endDateInput,
+            workingDaysInfoEl, calculateDaysButtonEl, holidaysInPeriodEl, calculateDaysButtonContainerEl,
+            periodInfoContainerEl, confirmationModalEl, modalEmployeeNameEl, confirmButtonEl, cancelButtonEl,
+            receiptTypeSelectionEl, internPeriodContainerEl, internPeriodSelectEl, receiptTitleEl, receiptDateTopEl,
+            userIdDisplayEl, calendarEl, currentMonthYearEl, prevMonthBtn, nextMonthBtn, clearMarkingButton,
+            generateReceiptButton, messageModalEl, messageModalTitleEl, messageModalContentEl, messageModalCloseButton,
+            newEmployeeNameInput, newEmployeeCpfInput, addEmployeeButton, deleteConfirmationModalEl,
+            deleteEmployeeNameEl, cancelDeleteButton, confirmDeleteButton, exportEmployeesButton, importEmployeesButton, importEmployeesFile; 
 
         let selectedEmployeeForReceipt = null;
         let calculatedWorkingDays = 0;
@@ -489,7 +447,6 @@
         let currentMarkType = 'absence';
         let employeeToDeleteCpf = null;
 
-        // Variable to control which period is active for calendar marking
         let calendarMarkablePeriod = { start: null, end: null };
 
         /**
@@ -501,7 +458,6 @@
                 auth = getAuth(app);
                 db = getFirestore(app);
 
-                // Sign in with custom token if available, otherwise anonymously
                 const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
                 if (initialAuthToken) {
                     await signInWithCustomToken(auth, initialAuthToken);
@@ -509,20 +465,19 @@
                     await signInAnonymously(auth);
                 }
 
-                // Listen for auth state changes
                 onAuthStateChanged(auth, (user) => {
                     if (user) {
                         currentUserId = user.uid;
-                        userIdDisplayEl.textContent = currentUserId;
+                        if (userIdDisplayEl) userIdDisplayEl.textContent = currentUserId; 
                         isAuthReady = true;
                         console.log("Firebase Auth Ready. User ID:", currentUserId);
-                        setupFirestoreListeners(); // Setup listeners after auth is ready
+                        setupFirestoreListeners(); 
                     } else {
                         currentUserId = null;
-                        userIdDisplayEl.textContent = 'Não autenticado';
+                        if (userIdDisplayEl) userIdDisplayEl.textContent = 'Não autenticado'; 
                         isAuthReady = false;
                         console.log("Firebase Auth Not Ready.");
-                        employeeData = []; // Clear data if not authenticated
+                        employeeData = []; 
                         renderEmployeeList();
                     }
                 });
@@ -534,14 +489,12 @@
 
         /**
          * Sets up real-time listeners for employee data from Firestore.
-         * Data is stored in a public collection for this app.
          */
         function setupFirestoreListeners() {
             if (!db || !currentUserId) {
                 console.warn("Firestore or User ID not available for listeners.");
                 return;
             }
-            // Using a public collection path for shared employees
             const employeesCollectionRef = collection(db, `artifacts/${appId}/public/data/employees`);
             const q = query(employeesCollectionRef);
 
@@ -551,15 +504,14 @@
                     employees.push({ id: doc.id, ...doc.data() });
                 });
                 employeeData = employees;
-                employeeData.sort((a, b) => a.nome.localeCompare(b.nome)); // Sort after fetching
+                employeeData.sort((a, b) => a.nome.localeCompare(b.nome)); 
                 console.log("Employee data updated from Firestore:", employeeData);
-                renderEmployeeList(searchInputEl.value); // Re-render with current search filter
+                renderEmployeeList(searchInputEl ? searchInputEl.value : ''); 
             }, (error) => {
                 console.error("Error fetching employee data from Firestore:", error);
                 showMessageModal("Erro de Dados", `Não foi possível carregar os dados das funcionárias: ${error.message}`);
-                // Fallback to default data if Firestore fails to load
                 employeeData = defaultEmployeeData.map(emp => ({ ...emp, nome: formatEmployeeName(emp.nome) })).sort((a, b) => a.nome.localeCompare(b.nome));
-                renderEmployeeList(searchInputEl.value);
+                renderEmployeeList(searchInputEl ? searchInputEl.value : '');
             });
         }
 
@@ -600,9 +552,6 @@
 
         /**
          * Converts a number to its Portuguese word representation for monetary values.
-         * Handles numbers up to thousands.
-         * @param {number} num - The number to convert.
-         * @returns {string} The number in words.
          */
         function numberToWords(num) {
             let numericValue = parseFloat(num);
@@ -630,7 +579,7 @@
                         str += getWordsPart(Math.floor(n / 1000)) + " mil";
                     }
                     n %= 1000;
-                    if (n > 0) str += " e "; // Add "e" if there are remaining hundreds/tens/units
+                    if (n > 0) str += " e "; 
                 }
 
                 if (n >= 100) {
@@ -679,19 +628,18 @@
          * Renders the calendar for the current month and year.
          */
         function renderCalendar() {
+            if (!calendarEl || !currentMonthYearEl) return; 
             calendarEl.innerHTML = '';
             const today = new Date();
             const firstDayOfMonth = new Date(currentCalendarYear, currentCalendarMonth, 1);
             const lastDayOfMonth = new Date(currentCalendarYear, currentCalendarMonth + 1, 0);
             const daysInMonth = lastDayOfMonth.getDate();
-            const firstDayOfWeek = firstDayOfMonth.getDay(); // 0 for Sunday, 1 for Monday, etc.
+            const firstDayOfWeek = firstDayOfMonth.getDay(); 
 
             const monthNames = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
-            const dayNames = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
-
             currentMonthYearEl.textContent = `${monthNames[currentCalendarMonth]} ${currentCalendarYear}`;
 
-            // Add day headers
+            const dayNames = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
             dayNames.forEach(day => {
                 const dayHeader = document.createElement('div');
                 dayHeader.className = 'calendar-day header';
@@ -699,25 +647,22 @@
                 calendarEl.appendChild(dayHeader);
             });
 
-            // Fill in days from the previous month
             for (let i = 0; i < firstDayOfWeek; i++) {
                 const prevMonthDate = new Date(currentCalendarYear, currentCalendarMonth, 0 - (firstDayOfWeek - 1 - i));
                 const dayEl = document.createElement('div');
-                dayEl.className = 'calendar-day other-month disabled-for-marking'; // Disable days from other months
+                dayEl.className = 'calendar-day other-month disabled-for-marking'; 
                 dayEl.textContent = prevMonthDate.getDate();
                 calendarEl.appendChild(dayEl);
             }
 
-            // Fill in days of the current month
             for (let day = 1; day <= daysInMonth; day++) {
                 const date = new Date(currentCalendarYear, currentCalendarMonth, day);
                 const isoDateString = date.toISOString().split('T')[0];
                 const dayEl = document.createElement('div');
                 dayEl.className = 'calendar-day current-month';
                 dayEl.textContent = day;
-                dayEl.dataset.date = isoDateString; // Store ISO date for easy reference
+                dayEl.dataset.date = isoDateString; 
 
-                // Add classes for holidays, absences, certificates, and today
                 if (holidays2025.some(h => h.date === isoDateString)) {
                     dayEl.classList.add('holiday');
                 }
@@ -731,23 +676,21 @@
                     dayEl.classList.add('today');
                 }
 
-                // Check if the day is within the active marking period
                 if (calendarMarkablePeriod.start && calendarMarkablePeriod.end && 
                     date >= calendarMarkablePeriod.start && date <= calendarMarkablePeriod.end) {
                     dayEl.addEventListener('click', () => toggleDateSelection(isoDateString, dayEl));
                 } else {
-                    dayEl.classList.add('disabled-for-marking'); // Disable days outside the markable period
+                    dayEl.classList.add('disabled-for-marking'); 
                 }
                 calendarEl.appendChild(dayEl);
             }
 
-            // Fill in days from the next month
             const totalDaysDisplayed = firstDayOfWeek + daysInMonth;
-            const remainingDays = 42 - totalDaysDisplayed; // 6 rows * 7 days = 42 cells
+            const remainingDays = 42 - totalDaysDisplayed; 
             for (let i = 1; i <= remainingDays; i++) {
                 const nextMonthDate = new Date(currentCalendarYear, currentCalendarMonth + 1, i);
                 const dayEl = document.createElement('div');
-                dayEl.className = 'calendar-day other-month disabled-for-marking'; // Disable days from other months
+                dayEl.className = 'calendar-day other-month disabled-for-marking'; 
                 dayEl.textContent = nextMonthDate.getDate();
                 calendarEl.appendChild(dayEl);
             }
@@ -755,13 +698,10 @@
 
         /**
          * Toggles the selection of a date as an absence, certificate, or clears the marking.
-         * @param {string} dateString - The date string in ISO format (YYYY-MM-DD).
-         * @param {HTMLElement} element - The calendar day element.
          */
         function toggleDateSelection(dateString, element) {
             const date = new Date(dateString + 'T00:00:00');
 
-            // Impede a marcação se a data estiver fora do período de marcação ativo
             if (!calendarMarkablePeriod.start || !calendarMarkablePeriod.end || 
                 date < calendarMarkablePeriod.start || date > calendarMarkablePeriod.end) {
                 return;
@@ -774,7 +714,7 @@
                 } else {
                     selectedAbsenceDates.add(dateString);
                     element.classList.add('selected-absence');
-                    selectedCertificateDates.delete(dateString); // Remove de atestado se for marcado como falta
+                    selectedCertificateDates.delete(dateString); 
                     element.classList.remove('selected-certificate');
                 }
             } else if (currentMarkType === 'certificate') {
@@ -784,21 +724,15 @@
                 } else {
                     selectedCertificateDates.add(dateString);
                     element.classList.add('selected-certificate');
-                    selectedAbsenceDates.delete(dateString); // Remove de falta se for marcado como atestado
+                    selectedAbsenceDates.delete(dateString); 
                     element.classList.remove('selected-absence');
                 }
             }
-            // Recalcula os dias efetivos após a alteração
             updateReceiptDisplay(); 
         }
 
         /**
-         * Calculates effective working days within a given date range, considering marked absences/certificates.
-         * @param {Date} startDate - The start date of the period.
-         * @param {Date} endDate - The end date of the period.
-         * @param {Set<string>} absencesSet - Set of ISO date strings for absences.
-         * @param {Set<string>} certificatesSet - Set of ISO date strings for certificates.
-         * @returns {{effectiveDays: number, absenceDaysCount: number, certificateDaysCount: number, holidaysInPeriod: Array<Object>}} Counts and holidays.
+         * Calculates effective working days within a given date range.
          */
         function calculateDaysForPeriod(startDate, endDate, absencesSet, certificatesSet) {
             let count = 0;
@@ -834,17 +768,13 @@
         }
         
         /**
-         * Filters a global set of marked dates (absences or certificates) to find those within a specific month.
-         * @param {Set<string>} globalMarkedDatesSet - The global Set of all marked dates.
-         * @param {number} year - The year of the target month.
-         * @param {number} monthIndex - The 0-indexed month (0-11) of the target month.
-         * @returns {Set<string>} A new Set containing only dates from the specified month.
+         * Filters a global set of marked dates to find those within a specific month.
          */
         function getMarkedDatesInSpecificMonth(globalMarkedDatesSet, year, monthIndex) {
             const startOfMonth = new Date(year, monthIndex, 1);
             const endOfMonth = new Date(year, monthIndex + 1, 0);
             const filteredDates = Array.from(globalMarkedDatesSet).filter(dateString => {
-                const date = new Date(dateString + 'T00:00:00'); // Ensure date is treated as local time
+                const date = new Date(dateString + 'T00:00:00'); 
                 return date >= startOfMonth && date <= endOfMonth;
             });
             return new Set(filteredDates);
@@ -852,67 +782,60 @@
 
         /**
          * Handles the change of the selected receipt type.
-         * Updates calendar display and marking period, then refreshes receipt display.
          */
         function handleReceiptTypeChange() {
             selectedReceiptType = document.querySelector('input[name="receiptType"]:checked').value;
             
-            // Hide intern period container by default
-            internPeriodContainerEl.classList.add('hidden');
+            if (internPeriodContainerEl) internPeriodContainerEl.classList.add('hidden'); 
             
             const mainPeriodStartDate = startDateInput.value ? new Date(startDateInput.value + 'T00:00:00') : null;
             const mainPeriodEndDate = endDateInput.value ? new Date(endDateInput.value + 'T00:00:00') : null;
 
             if (selectedReceiptType === 'salarioEstagiario') {
-                internPeriodContainerEl.classList.remove('hidden');
+                if (internPeriodContainerEl) internPeriodContainerEl.classList.remove('hidden'); 
             }
 
-            // Toggle visibility of "Calcular Dias" button and period info based on receipt type
-            if (selectedReceiptType === 'valeTransporte' || selectedReceiptType === 'salarioEstagiario' || selectedReceiptType === 'bonificacao') {
-                calculateDaysButtonContainerEl.classList.add('hidden');
-                periodInfoContainerEl.classList.add('hidden');
-            } else { 
-                calculateDaysButtonContainerEl.classList.remove('hidden');
-                periodInfoContainerEl.classList.remove('hidden');
+            if (calculateDaysButtonContainerEl && periodInfoContainerEl) { 
+                if (selectedReceiptType === 'valeTransporte' || selectedReceiptType === 'salarioEstagiario' || selectedReceiptType === 'bonificacao') {
+                    calculateDaysButtonContainerEl.classList.add('hidden');
+                    periodInfoContainerEl.classList.add('hidden');
+                } else { 
+                    calculateDaysButtonContainerEl.classList.remove('hidden');
+                    periodInfoContainerEl.classList.remove('hidden');
+                }
             }
 
-
-            // Adjust calendar display and marking period based on receipt type
-            if (selectedReceiptType === 'valeTransporte' && mainPeriodStartDate) {
-                // For Vale Transporte, calendar shows previous month, and only allows marking there
-                const prevMonthDate = new Date(mainPeriodStartDate.getFullYear(), mainPeriodStartDate.getMonth() - 1, 1);
-                currentCalendarMonth = prevMonthDate.getMonth();
-                currentCalendarYear = prevMonthDate.getFullYear();
-                calendarMarkablePeriod.start = prevMonthDate;
-                calendarMarkablePeriod.end = new Date(mainPeriodStartDate.getFullYear(), mainPeriodStartDate.getMonth(), 0); // Last day of previous month
-            } else if (mainPeriodStartDate && mainPeriodEndDate) {
-                // For other types, calendar shows current selected period, and allows marking within it
-                currentCalendarMonth = mainPeriodStartDate.getMonth();
-                currentCalendarYear = mainPeriodStartDate.getFullYear();
-                calendarMarkablePeriod.start = mainPeriodStartDate;
-                calendarMarkablePeriod.end = mainPeriodEndDate;
+            if (mainPeriodStartDate && mainPeriodEndDate) { 
+                if (selectedReceiptType === 'valeTransporte') {
+                    const prevMonthDate = new Date(mainPeriodStartDate.getFullYear(), mainPeriodStartDate.getMonth() - 1, 1);
+                    currentCalendarMonth = prevMonthDate.getMonth();
+                    currentCalendarYear = prevMonthDate.getFullYear();
+                    calendarMarkablePeriod.start = prevMonthDate;
+                    calendarMarkablePeriod.end = new Date(mainPeriodStartDate.getFullYear(), mainPeriodStartDate.getMonth(), 0); 
+                } else { 
+                    currentCalendarMonth = mainPeriodStartDate.getMonth();
+                    currentCalendarYear = mainPeriodStartDate.getFullYear();
+                    calendarMarkablePeriod.start = mainPeriodStartDate;
+                    calendarMarkablePeriod.end = mainPeriodEndDate;
+                }
             } else {
-                // No valid dates selected, disable marking
-                currentCalendarMonth = new Date().getMonth(); // Default to current month for display
+                currentCalendarMonth = new Date().getMonth();
                 currentCalendarYear = new Date().getFullYear();
                 calendarMarkablePeriod.start = null;
                 calendarMarkablePeriod.end = null;
             }
 
-            renderCalendar(); // Re-render calendar with new settings
-            updateReceiptDisplay(); // Update receipt content
+            renderCalendar(); 
+            updateReceiptDisplay(); 
         }
 
         /**
          * Helper function to capitalize the first letter of each word in a string.
-         * @param {string} str - The input string.
-         * @returns {string} The capitalized string.
          */
         function capitalizeWords(str) {
             if (!str) return '';
             return str.split(' ').map(word => {
                 if (word.length === 0) return '';
-                // Handle common conjunctions/prepositions in Portuguese
                 const lowerWord = word.toLowerCase();
                 if (['de', 'da', 'do', 'dos', 'das', 'e', 'em', 'com', 'sem', 'para', 'por'].includes(lowerWord)) {
                     return lowerWord;
@@ -923,9 +846,9 @@
 
         /**
          * Renders the list of employees based on a search filter.
-         * @param {string} filter - The search string.
          */
         function renderEmployeeList(filter = '') {
+            if (!employeeListEl) return; 
             employeeListEl.innerHTML = '';
             const filteredData = employeeData.filter(emp => formatEmployeeName(emp.nome).toLowerCase().includes(filter.toLowerCase()));
             
@@ -945,25 +868,25 @@
                         </svg>
                     </button>
                 `;
-                item.dataset.cpf = employee.cpf; // Store CPF for easy access
+                item.dataset.cpf = employee.cpf; 
                 
-                // Add event listener for the employee item (excluding the delete button)
                 item.addEventListener('click', (event) => {
                     if (!event.target.closest('button')) {
                         selectEmployee(employee, item);
                     }
                 });
 
-                // Add event listener for the delete button
                 const deleteButton = item.querySelector('button');
-                deleteButton.addEventListener('click', async (event) => { // Made async to await Firestore delete
-                    event.stopPropagation(); // Prevent employee selection when clicking delete
-                    showDeleteConfirmationModal(employee.id, formatEmployeeName(employee.nome)); // Pass Firestore doc ID
-                });
+                if (deleteButton) { 
+                    deleteButton.addEventListener('click', async (event) => { 
+                        event.stopPropagation(); 
+                        showDeleteConfirmationModal(employee.id, formatEmployeeName(employee.nome)); 
+                    });
+                }
 
                 employeeListEl.appendChild(item);
             });
-            // Add 'selected' class if employee is already selected
+
             if (selectedEmployeeForReceipt) {
                 const currentSelectedEl = employeeListEl.querySelector(`[data-cpf="${selectedEmployeeForReceipt.cpf}"]`);
                 if (currentSelectedEl) {
@@ -974,15 +897,11 @@
 
         /**
          * Formats a given name string by capitalizing the first letter of each word and lowercasing the rest.
-         * Used for consistent display of employee names.
-         * @param {string} name - The employee's full name.
-         * @returns {string} The formatted name.
          */
         function formatEmployeeName(name) {
             if (!name) return '';
             return name.split(' ').map(word => {
                 if (word.length === 0) return '';
-                // Handle common conjunctions/prepositions in Portuguese
                 const lowerWord = word.toLowerCase();
                 if (['de', 'da', 'do', 'dos', 'das', 'e', 'em', 'com', 'sem', 'para', 'por'].includes(lowerWord)) {
                     return lowerWord;
@@ -993,47 +912,40 @@
 
         /**
          * Selects an employee and updates the UI.
-         * @param {object} employee - The selected employee object.
-         * @param {HTMLElement} element - The HTML element representing the selected employee.
          */
         function selectEmployee(employee, element) {
-            // Remove 'selected' class from any previously selected employee
             const currentlySelected = employeeListEl.querySelector('.employee-item.selected');
             if (currentlySelected) {
                 currentlySelected.classList.remove('selected');
             }
-            // Add 'selected' class to the clicked employee
-            element.classList.add('selected');
+            if (element) { 
+                element.classList.add('selected');
+            }
             selectedEmployeeForReceipt = employee;
             showMessageModal("Funcionária Selecionada", `Funcionária selecionada: ${formatEmployeeName(employee.nome)}`);
 
-            // Clear all fields when selecting a new employee
             startDateInput.value = '';
             endDateInput.value = '';
-            workingDaysInfoEl.textContent = "0";
-            holidaysInPeriodEl.textContent = "Nenhum";
+            if (workingDaysInfoEl) workingDaysInfoEl.textContent = "0"; 
+            if (holidaysInPeriodEl) holidaysInPeriodEl.textContent = "Nenhum"; 
             selectedAbsenceDates.clear();
             selectedCertificateDates.clear();
             
-            // Reset calendar to current month
             const today = new Date();
             currentCalendarMonth = today.getMonth();
             currentCalendarYear = today.getFullYear();
             
-            // Re-evaluate calendarMarkablePeriod based on the default receipt type and new employee selection
-            handleReceiptTypeChange(); // This will also call renderCalendar and updateReceiptDisplay
+            handleReceiptTypeChange(); 
 
-            // Hide receipt content and show welcome message
-            receiptContentEl.classList.add('hidden');
-            welcomeMessageEl.classList.remove('hidden');
+            if (receiptContentEl) receiptContentEl.classList.add('hidden'); 
+            if (welcomeMessageEl) welcomeMessageEl.classList.remove('hidden'); 
         }
 
         /**
          * Formats the CPF input field.
-         * @param {Event} event - The input event.
          */
         function formatCpfInput(event) {
-            let value = event.target.value.replace(/\D/g, ''); // Remove all non-digits
+            let value = event.target.value.replace(/\D/g, ''); 
             let formattedValue = '';
 
             if (value.length > 0) {
@@ -1060,22 +972,20 @@
                 return;
             }
 
-            const name = newEmployeeNameInput.value.trim();
-            const cpf = newEmployeeCpfInput.value.trim();
+            const name = newEmployeeNameInput ? newEmployeeNameInput.value.trim() : ''; 
+            const cpf = newEmployeeCpfInput ? newEmployeeCpfInput.value.trim() : ''; 
 
             if (!name || !cpf) {
                 showMessageModal("Erro de Entrada", "Por favor, preencha o nome e o CPF da nova funcionária.");
                 return;
             }
 
-            // Basic CPF format validation
             const cpfRegex = /^\d{3}\.\d{3}\.\d{3}-\d{2}$/;
             if (!cpfRegex.test(cpf)) {
                 showMessageModal("Erro de CPF", "Por favor, insira um CPF válido no formato XXX.XXX.XXX-XX.");
                 return;
             }
 
-            // Check if CPF already exists in current data
             if (employeeData.some(emp => emp.cpf === cpf)) {
                 showMessageModal("Erro de CPF", "Já existe uma funcionária com este CPF.");
                 return;
@@ -1085,13 +995,12 @@
 
             try {
                 const employeesCollectionRef = collection(db, `artifacts/${appId}/public/data/employees`);
-                // Use the clean CPF as the document ID for uniqueness
                 const cleanCpf = cpf.replace(/\D/g, '');
                 await setDoc(doc(employeesCollectionRef, cleanCpf), { nome: capitalizedName, cpf: cpf });
                 
                 showMessageModal("Sucesso", `Funcionária "${capitalizedName}" adicionada com sucesso!`);
-                newEmployeeNameInput.value = '';
-                newEmployeeCpfInput.value = '';
+                if (newEmployeeNameInput) newEmployeeNameInput.value = ''; 
+                if (newEmployeeCpfInput) newEmployeeCpfInput.value = ''; 
             } catch (error) {
                 console.error("Error adding employee to Firestore:", error);
                 showMessageModal("Erro ao Adicionar", `Não foi possível adicionar a funcionária: ${error.message}`);
@@ -1100,7 +1009,6 @@
 
         /**
          * Removes an employee from Firestore after confirmation.
-         * @param {string} employeeId - The Firestore document ID of the employee to delete (which is the clean CPF).
          */
         async function performRemoveEmployee(employeeId) {
             if (!isAuthReady || !currentUserId) {
@@ -1113,18 +1021,17 @@
                 const employeeDocRef = doc(db, `artifacts/${appId}/public/data/employees`, employeeId);
                 await deleteDoc(employeeDocRef);
                 
-                // If the removed employee was the selected one, clear selection
                 if (selectedEmployeeForReceipt && selectedEmployeeForReceipt.id === employeeId) {
                     selectedEmployeeForReceipt = null;
-                    receiptContentEl.classList.add('hidden');
-                    welcomeMessageEl.classList.remove('hidden');
+                    if (receiptContentEl) receiptContentEl.classList.add('hidden'); 
+                    if (welcomeMessageEl) welcomeMessageEl.classList.remove('hidden'); 
                 }
                 showMessageModal("Sucesso", `Funcionária removida com sucesso!`);
             } catch (error) {
                 console.error("Error removing employee from Firestore:", error);
                 showMessageModal("Erro ao Remover", `Não foi possível remover a funcionária: ${error.message}`);
             } finally {
-                employeeToDeleteCpf = null; // Clear the temporary storage
+                employeeToDeleteCpf = null; 
             }
         }
 
@@ -1137,32 +1044,30 @@
                 return;
             }
 
-            // Ensure the receipt display is updated just before confirmation to get latest values
             updateReceiptDisplay();
 
+            const startDateValue = startDateInput ? startDateInput.value : ''; 
+            const endDateValue = endDateInput ? endDateInput.value : ''; 
+
             const { effectiveDays, absenceDaysCount, certificateDaysCount } = 
-                calculateDaysForPeriod(new Date(startDateInput.value + 'T00:00:00'), new Date(endDateInput.value + 'T00:00:00'), selectedAbsenceDates, selectedCertificateDates);
+                calculateDaysForPeriod(new Date(startDateValue + 'T00:00:00'), new Date(endDateValue + 'T00:00:00'), selectedAbsenceDates, selectedCertificateDates);
 
 
-            // Check if the period is valid before showing the modal
-            const startDate = new Date(startDateInput.value + 'T00:00:00');
-            const endDate = new Date(endDateInput.value + 'T00:00:00');
+            const startDate = new Date(startDateValue + 'T00:00:00');
+            const endDate = new Date(endDateValue + 'T00:00:00');
             if (isNaN(startDate) || isNaN(endDate) || startDate > endDate || startDate.getMonth() !== endDate.getMonth() || startDate.getFullYear() !== endDate.getFullYear()) {
                 showMessageModal("Erro de Período", "Por favor, selecione um período válido e que esteja contido no mesmo mês antes de gerar um recibo.");
                 return;
             }
             
-            // For Bonificação, we now generate with 0 if there's absence/certificate, so no early return here.
-            // Check for other types: if selectedReceiptType is not VT and not Bonificação, and effectiveDays is 0, show error.
-            if (selectedReceiptType !== 'valeTransporte' && selectedReceiptType !== 'bonificacao' && effectiveDays <= 0) { 
-                 showMessageModal("Erro de Dias Úteis", "O período selecionado não resultou em dias úteis efetivos. Verifique as datas, feriados, faltas e atestados.");
-                 return;
+            if (selectedReceiptType === 'bonificacao' && (absenceDaysCount > 0 || certificateDaysCount > 0)) {
+                showMessageModal("Erro de Bonificação", "Não é possível gerar o recibo de bonificação devido a falta ou atestado no período selecionado.");
+                return;
             }
 
-            // For Vale Transporte, check previous month absences for confirmation logic
             if (selectedReceiptType === 'valeTransporte') {
-                const currentMonthStartDate = new Date(startDateInput.value + 'T00:00:00');
-                const currentMonthEndDate = new Date(endDateInput.value + 'T00:00:00');
+                const currentMonthStartDate = new Date(startDateValue + 'T00:00:00'); 
+                const currentMonthEndDate = new Date(endDateValue + 'T00:00:00'); 
 
                 let totalPossibleWorkingDaysInCurrentMonth = 0;
                 const tempDate = new Date(currentMonthStartDate);
@@ -1187,64 +1092,64 @@
                     showMessageModal("Erro de Dias Úteis", "O período selecionado para Vale Transporte não resultou em dias úteis efetivos, considerando as faltas e atestados do mês anterior.");
                     return;
                 }
+            } else if (effectiveDays <= 0) { 
+                 showMessageModal("Erro de Dias Úteis", "O período selecionado não resultou em dias úteis efetivos. Verifique as datas, feriados, faltas e atestados.");
+                 return;
             }
 
-            modalEmployeeNameEl.textContent = `Gerar recibo para ${formatEmployeeName(selectedEmployeeForReceipt.nome)}?`; // Format name in modal
-            confirmationModalEl.classList.remove('hidden');
+            if (modalEmployeeNameEl) modalEmployeeNameEl.textContent = `Gerar recibo para ${formatEmployeeName(selectedEmployeeForReceipt.nome)}?`; 
+            if (confirmationModalEl) confirmationModalEl.classList.remove('hidden'); 
         }
 
         /** Hides the confirmation modal. */
         function hideConfirmationModal() {
-            confirmationModalEl.classList.add('hidden');
+            if (confirmationModalEl) confirmationModalEl.classList.add('hidden'); 
         }
         
         /**
          * Displays a generic message modal.
-         * @param {string} title - The title of the message.
-         * @param {string} content - The content of the message.
          */
         function showMessageModal(title, content) {
-            messageModalTitleEl.textContent = title;
-            messageModalContentEl.textContent = content;
-            messageModalEl.classList.remove('hidden');
+            if (messageModalTitleEl) messageModalTitleEl.textContent = title;
+            if (messageModalContentEl) messageModalContentEl.textContent = content;
+            if (messageModalEl) messageModalEl.classList.remove('hidden');
+            if (messageModalCloseButton) messageModalCloseButton.onclick = hideMessageModal;
         }
 
         /** Hides the generic message modal. */
         function hideMessageModal() {
-            messageModalEl.classList.add('hidden');
+            if (messageModalEl) messageModalEl.classList.add('hidden'); 
         }
 
         /**
          * Displays the delete confirmation modal.
-         * @param {string} employeeId - The Firestore document ID (clean CPF) of the employee to delete.
-         * @param {string} employeeName - The formatted name of the employee to delete.
          */
         function showDeleteConfirmationModal(employeeId, employeeName) {
-            employeeToDeleteCpf = employeeId; // Store the ID temporarily
-            deleteEmployeeNameEl.textContent = employeeName; 
-            deleteConfirmationModalEl.classList.remove('hidden');
+            employeeToDeleteCpf = employeeId; 
+            if (deleteEmployeeNameEl) deleteEmployeeNameEl.textContent = employeeName; 
+            if (deleteConfirmationModalEl) deleteConfirmationModalEl.classList.remove('hidden'); 
         }
 
         /** Hides the delete confirmation modal. */
         function hideDeleteConfirmationModal() {
-            deleteConfirmationModalEl.classList.add('hidden');
-            employeeToDeleteCpf = null; // Clear temporary storage
+            if (deleteConfirmationModalEl) deleteConfirmationModalEl.classList.add('hidden'); 
+            employeeToDeleteCpf = null; 
         }
 
         /**
          * Updates the receipt display based on selected employee and receipt type.
          */
         function updateReceiptDisplay() {
-            if (!selectedEmployeeForReceipt) {
-                receiptContentEl.classList.add('hidden');
-                welcomeMessageEl.classList.remove('hidden');
+            if (!selectedEmployeeForReceipt || !receiptContentEl || !welcomeMessageEl || !receiptDateTopEl) {
+                if (receiptContentEl) receiptContentEl.classList.add('hidden');
+                if (welcomeMessageEl) welcomeMessageEl.classList.remove('hidden');
+                // console.error("Erro: Elementos essenciais do recibo não foram encontrados no DOM ao tentar atualizar a exibição."); // Removed console.error
                 return;
             }
 
             welcomeMessageEl.classList.add('hidden');
             receiptContentEl.classList.remove('hidden');
             
-            // Set the receipt date at the top
             receiptDateTopEl.textContent = getCurrentDateFormatted();
 
 
@@ -1254,12 +1159,14 @@
             let dailyValueHtml = '';
             let additionalInfo = ''; 
 
-            const receiptPeriodStartDate = new Date(startDateInput.value + 'T00:00:00');
-            const receiptPeriodEndDate = new Date(endDateInput.value + 'T00:00:00');
+            const startDateValue = startDateInput ? startDateInput.value : ''; 
+            const endDateValue = endDateInput ? endDateInput.value : ''; 
+
+            const receiptPeriodStartDate = new Date(startDateValue + 'T00:00:00');
+            const receiptPeriodEndDate = new Date(endDateValue + 'T00:00:00');
             const monthNames = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
             const receiptPeriodMonthName = monthNames[receiptPeriodStartDate.getMonth()];
 
-            // Calculate days for the MAIN RECEIPT PERIOD (current month's inputs)
             const { effectiveDays, absenceDaysCount, certificateDaysCount, holidaysInPeriod } = 
                 calculateDaysForPeriod(receiptPeriodStartDate, receiptPeriodEndDate, selectedAbsenceDates, selectedCertificateDates);
             
@@ -1291,8 +1198,8 @@
                 let deduction = (prevMonthAbsences.size + prevMonthCertificates.size) * receiptBaseDetails.dailyValue;
                 totalValue = baseValue - deduction;
 
-                document.getElementById('receipt-description').textContent = "REFERENTE AO VALE TRANSPORTE";
-                periodText = `<strong>Período:</strong> ${totalPossibleWorkingDaysInCurrentMonth} dias úteis efetivos do mês de ${receiptPeriodMonthName} (${formatDate(startDateInput.value)} até ${formatDate(endDateInput.value)}).`;
+                if(document.getElementById('receipt-description')) document.getElementById('receipt-description').textContent = "REFERENTE AO VALE TRANSPORTE"; 
+                periodText = `<strong>Período:</strong> ${totalPossibleWorkingDaysInCurrentMonth} dias úteis efetivos do mês de ${receiptPeriodMonthName} (${formatDate(startDateValue)} até ${formatDate(endDateValue)}).`; 
                 dailyValueHtml = `<strong>Valor Diário:</strong> ${formatCurrency(receiptBaseDetails.dailyValue)} (${numberToWords(receiptBaseDetails.dailyValue)})`;
                 
                 const prevMonthNameForDisplay = monthNames[prevMonthStartDate.getMonth()];
@@ -1309,10 +1216,10 @@
                 const fixedDivisorForAbsence = 30;
                 const dailyAllowance = monthlyAllowance / fixedDivisorForAbsence;
                 totalValue = monthlyAllowance - (absenceDaysCount * dailyAllowance); 
-                document.getElementById('receipt-description').textContent = `REFERENTE À BOLSA ESTÁGIO (${internPeriodSelectEl.value === 'matutino' ? 'Período Matutino' : 'Período Vespertino'})`;
+                if(document.getElementById('receipt-description')) document.getElementById('receipt-description').textContent = `REFERENTE À BOLSA ESTÁGIO (${internPeriodSelectEl && internPeriodSelectEl.value === 'matutino' ? 'Período Matutino' : 'Período Vespertino'})`; 
                 
-                const internPeriodDisplay = internPeriodSelectEl.value === 'matutino' ? 'Matutino' : 'Vespertino';
-                periodText = `<strong>Período:</strong> dias trabalhados do mês de ${receiptPeriodMonthName} (${internPeriodDisplay}) (${formatDate(startDateInput.value)} até ${formatDate(endDateInput.value)}).`;
+                const internPeriodDisplay = internPeriodSelectEl && internPeriodSelectEl.value === 'matutino' ? 'Matutino' : 'Vespertino'; 
+                periodText = `<strong>Período:</strong> dias trabalhados do mês de ${receiptPeriodMonthName} (${internPeriodDisplay}) (${formatDate(startDateValue)} até ${formatDate(endDateValue)}).`; 
                 
                 dailyValueHtml = `<strong>Valor Fixo Mensal:</strong> ${formatCurrency(receiptBaseDetails.monthlyAllowance)} (${numberToWords(receiptBaseDetails.monthlyAllowance)})`;
                 totalWordsLabelText = 'Valor Total à receber:'; 
@@ -1337,9 +1244,9 @@
                     totalValue = receiptBaseDetails.fixedBonusAmount; 
                 }
 
-                document.getElementById('receipt-description').textContent = `REFERENTE À BONIFICAÇÃO`;
+                if(document.getElementById('receipt-description')) document.getElementById('receipt-description').textContent = `REFERENTE À BONIFICAÇÃO`; 
                 
-                periodText = `<strong>Período:</strong> dias trabalhados do mês de ${receiptPeriodMonthName} (${formatDate(startDateInput.value)} até ${formatDate(endDateInput.value)}).`;
+                periodText = `<strong>Período:</strong> dias trabalhados do mês de ${receiptPeriodMonthName} (${formatDate(startDateValue)} até ${formatDate(endDateValue)}).`; 
                 
                 dailyValueHtml = `<strong>Valor Fixo Mensal:</strong> ${formatCurrency(receiptBaseDetails.fixedBonusAmount)} (${numberToWords(receiptBaseDetails.fixedBonusAmount)})`; 
                 totalWordsLabelText = 'Valor total à receber:'; 
@@ -1366,38 +1273,32 @@
                 words = "Erro na conversão"; 
             }
 
-            // Update receipt elements
-            document.getElementById('receipt-total').textContent = formatCurrency(totalValue);
-            document.getElementById('receipt-payer').textContent = receiptBaseDetails.payer;
-            document.getElementById('receipt-cnpj').textContent = `CNPJ: ${receiptBaseDetails.cnpj}`;
-            document.getElementById('employee-name').textContent = formatEmployeeName(selectedEmployeeForReceipt.nome); 
-            document.getElementById('employee-cpf').textContent = selectedEmployeeForReceipt.cpf;
+            if(document.getElementById('receipt-total')) document.getElementById('receipt-total').textContent = formatCurrency(totalValue); 
+            if(document.getElementById('receipt-payer')) document.getElementById('receipt-payer').textContent = receiptBaseDetails.payer; 
+            if(document.getElementById('receipt-cnpj')) document.getElementById('receipt-cnpj').textContent = `CNPJ: ${receiptBaseDetails.cnpj}`; 
+            if(document.getElementById('employee-name')) document.getElementById('employee-name').textContent = formatEmployeeName(selectedEmployeeForReceipt.nome); 
+            if(document.getElementById('employee-cpf')) document.getElementById('employee-cpf').textContent = selectedEmployeeForReceipt.cpf; 
             
-            document.getElementById('receipt-period-info').innerHTML = periodText;
-            document.getElementById('receipt-daily-value').innerHTML = dailyValueHtml;
-            document.getElementById('receipt-holidays-info').innerHTML = additionalInfo;
+            if(document.getElementById('receipt-period-info')) document.getElementById('receipt-period-info').innerHTML = periodText; 
+            if(document.getElementById('receipt-daily-value')) document.getElementById('receipt-daily-value').innerHTML = dailyValueHtml; 
+            if(document.getElementById('receipt-holidays-info')) document.getElementById('receipt-holidays-info').innerHTML = additionalInfo; 
 
-            document.getElementById('receipt-total-words-label').textContent = totalWordsLabelText;
-            document.getElementById('receipt-total-words').textContent = words; 
-            document.getElementById('employee-signature-name').textContent = formatEmployeeName(selectedEmployeeForReceipt.nome); 
+            if(document.getElementById('receipt-total-words-label')) document.getElementById('receipt-total-words-label').textContent = totalWordsLabelText; 
+            if(document.getElementById('receipt-total-words')) document.getElementById('receipt-total-words').textContent = words; 
+            if(document.getElementById('employee-signature-name')) document.getElementById('employee-signature-name').textContent = formatEmployeeName(selectedEmployeeForReceipt.nome); 
             
-            if (selectedReceiptType === 'valeTransporte') {
-                receiptTitleEl.textContent = "Recibo de vale transporte";
-            } else if (selectedReceiptType === 'salarioEstagiario') {
-                receiptTitleEl.textContent = "Recibo Bolsa Estágio";
-            } else if (selectedReceiptType === 'bonificacao') {
-                receiptTitleEl.textContent = "Recibo de bonificação";
-            } else {
-                receiptTitleEl.textContent = "Recibo"; 
+            if (receiptTitleEl) { 
+                if (selectedReceiptType === 'valeTransporte') {
+                    receiptTitleEl.textContent = "Recibo de vale transporte";
+                } else if (selectedReceiptType === 'salarioEstagiario') {
+                    receiptTitleEl.textContent = "Recibo Bolsa Estágio";
+                } else if (selectedReceiptType === 'bonificacao') {
+                    receiptTitleEl.textContent = "Recibo de bonificação";
+                } else {
+                    receiptTitleEl.textContent = "Recibo"; 
+                }
             }
         }
-
-        // Removed the updateChart function as it's no longer used.
-        /*
-        function updateChart(selectedEmployee, currentTotal) {
-            // ... (removed chart logic)
-        }
-        */
         
         /**
          * Exports employee data to a plain text file for download.
@@ -1429,20 +1330,38 @@
             }
 
             const reader = new FileReader();
-            reader.onload = (e) => {
+            reader.onload = async (e) => { 
                 const content = e.target.result;
                 const lines = content.split('\n').filter(line => line.trim() !== '' && !line.startsWith('Nome,CPF')); 
                 const importedData = [];
                 let hasError = false;
 
-                lines.forEach(line => {
+                const employeesCollectionRef = collection(db, `artifacts/${appId}/public/data/employees`);
+
+                // Clear existing Firestore data before importing
+                const currentDocs = await getDocs(query(employeesCollectionRef));
+                const deletePromises = [];
+                currentDocs.forEach(docSnapshot => {
+                    deletePromises.push(deleteDoc(doc(employeesCollectionRef, docSnapshot.id)));
+                });
+                await Promise.all(deletePromises);
+
+                for (const line of lines) { 
                     const parts = line.split(',');
                     if (parts.length === 2) {
                         const nome = parts[0].trim();
                         const cpf = parts[1].trim();
                         const cpfRegex = /^\d{3}\.\d{3}\.\d{3}-\d{2}$/;
                         if (cpfRegex.test(cpf)) {
-                             importedData.push({ nome: formatEmployeeName(nome), cpf: cpf });
+                            const cleanCpf = cpf.replace(/\D/g, '');
+                            try {
+                                await setDoc(doc(employeesCollectionRef, cleanCpf), { nome: formatEmployeeName(nome), cpf: cpf });
+                                importedData.push({ id: cleanCpf, nome: formatEmployeeName(nome), cpf: cpf });
+                            } catch (error) {
+                                hasError = true;
+                                console.error(`Error saving imported employee ${nome} to Firestore:`, error);
+                                showMessageModal("Erro de Importação", `Não foi possível salvar a funcionária ${nome} no Firestore: ${error.message}`);
+                            }
                         } else {
                             hasError = true;
                             console.warn(`Skipping invalid CPF format in line: ${line}`);
@@ -1451,14 +1370,10 @@
                         hasError = true;
                         console.warn(`Skipping malformed line in TXT: ${line}`);
                     }
-                });
+                }
 
                 if (importedData.length > 0) {
-                    // Overwrite current data with imported data
-                    employeeData = importedData; 
-                    employeeData.sort((a, b) => a.nome.localeCompare(b.nome)); 
-                    renderEmployeeList(); 
-                    showMessageModal("Importação Concluída", `Funcionárias importadas com sucesso! ${hasError ? "Algumas linhas com formato inválido foram ignoradas." : ""}`);
+                    showMessageModal("Importação Concluída", `Funcionárias importadas e salvas no banco de dados com sucesso! ${hasError ? "Algumas linhas com formato inválido foram ignoradas." : ""}`);
                 } else if (hasError) {
                     showMessageModal("Erro na Importação", "Nenhuma funcionária válida foi encontrada no arquivo ou o arquivo está vazio/malformado.");
                 } else {
@@ -1471,13 +1386,12 @@
         /**
          * Loads employee data from Firestore.
          * Falls back to defaultEmployeeData if loading fails or Firestore is empty.
-         * @returns {Promise<Array<Object>>} A promise that resolves with the employee data.
          */
         async function loadEmployeesFromFirestore() {
             try {
                 const employeesCollectionRef = collection(db, `artifacts/${appId}/public/data/employees`);
                 const q = query(employeesCollectionRef);
-                const querySnapshot = await getDocs(q); // Use getDocs for a one-time fetch on load
+                const querySnapshot = await getDocs(q); 
 
                 const loadedData = [];
                 querySnapshot.forEach(doc => {
@@ -1486,18 +1400,15 @@
 
                 if (loadedData.length === 0) {
                     console.warn("Firestore collection is empty. Initializing with default data.");
-                    // Add default data to Firestore if it's empty
                     for (const emp of defaultEmployeeData) {
                         const cleanCpf = emp.cpf.replace(/\D/g, '');
                         await setDoc(doc(employeesCollectionRef, cleanCpf), emp);
                     }
-                    // Fetch again to get the newly added default data with IDs
                     const newQuerySnapshot = await getDocs(q);
                     newQuerySnapshot.forEach(doc => {
                         loadedData.push({ id: doc.id, ...doc.data() });
                     });
                 }
-
                 loadedData.sort((a, b) => a.nome.localeCompare(b.nome));
                 return loadedData;
             } catch (error) {
@@ -1509,7 +1420,7 @@
         
         // Initialize the app on window load
         window.onload = async () => {
-            // DOM element references
+            // DOM element references (assigned locally within onload for robustness)
             employeeListEl = document.getElementById('employeeList');
             searchInputEl = document.getElementById('searchInput');
             welcomeMessageEl = document.getElementById('welcome-message');
@@ -1532,9 +1443,8 @@
             internPeriodSelectEl = document.getElementById('internPeriod');
             receiptTitleEl = document.getElementById('receipt-title');
             receiptDateTopEl = document.getElementById('receipt-date-top'); 
-            userIdDisplayEl = document.getElementById('userIdDisplay'); // Get reference to userIdDisplay
+            userIdDisplayEl = document.getElementById('userIdDisplay'); 
 
-            // Elementos do calendário
             calendarEl = document.getElementById('calendar');
             currentMonthYearEl = document.getElementById('currentMonthYear');
             prevMonthBtn = document.getElementById('prevMonth');
@@ -1542,47 +1452,43 @@
             clearMarkingButton = document.getElementById('clearMarkingButton');
             generateReceiptButton = document.getElementById('generateReceiptButton');
 
-            // Elementos do novo modal de mensagem
             messageModalEl = document.getElementById('messageModal');
-            messageModalTitleEl = document.getElementById('messageModalTitle'); 
+            messageModalTitleEl = document.getElementById('messageModalTitle'); // Corrected assignment
             messageModalContentEl = document.getElementById('messageModalContent');
             messageModalCloseButton = document.getElementById('messageModalCloseButton');
 
-            // Elementos para adicionar/remover funcionárias
             newEmployeeNameInput = document.getElementById('newEmployeeName');
             newEmployeeCpfInput = document.getElementById('newEmployeeCpf');
             addEmployeeButton = document.getElementById('addEmployeeButton');
-            // Removed export and import buttons/file input as Firebase will handle persistence
-            // exportEmployeesButton = document.getElementById('exportEmployeesButton'); 
-            // importEmployeesButton = document.getElementById('importEmployeesButton'); 
-            // importEmployeesFile = document.getElementById('importEmployeesFile'); 
+            exportEmployeesButton = document.getElementById('exportEmployeesButton'); 
+            importEmployeesButton = document.getElementById('importEmployeesButton'); 
+            importEmployeesFile = document.getElementById('importEmployeesFile'); 
 
-            // Elements for delete confirmation modal
             deleteConfirmationModalEl = document.getElementById('deleteConfirmationModal');
             deleteEmployeeNameEl = document.getElementById('deleteEmployeeName');
             cancelDeleteButton = document.getElementById('cancelDeleteButton');
             confirmDeleteButton = document.getElementById('confirmDeleteButton'); 
 
             // Initialize Firebase and load employee data
-            await initializeFirebase(); // Initialize Firebase first
+            await initializeFirebase(); 
 
-            // Event listener attachments
-            searchInputEl.addEventListener('keyup', (e) => renderEmployeeList(e.target.value));
-            startDateInput.addEventListener('change', () => {
+            // Event listener attachments (with null checks as elements might not always be present or loaded instantly)
+            if (searchInputEl) searchInputEl.addEventListener('keyup', (e) => renderEmployeeList(e.target.value));
+            if (startDateInput) startDateInput.addEventListener('change', () => {
                 selectedAbsenceDates.clear(); 
                 selectedCertificateDates.clear(); 
                 handleReceiptTypeChange(); 
             });
-            endDateInput.addEventListener('change', () => {
+            if (endDateInput) endDateInput.addEventListener('change', () => {
                 selectedAbsenceDates.clear(); 
                 selectedCertificateDates.clear(); 
                 handleReceiptTypeChange(); 
             });
-            calculateDaysButtonEl.addEventListener('click', updateReceiptDisplay); 
+            if (calculateDaysButtonEl) calculateDaysButtonEl.addEventListener('click', updateReceiptDisplay); 
             document.querySelectorAll('input[name="receiptType"]').forEach(radio => {
-                radio.addEventListener('change', handleReceiptTypeChange);
+                if (radio) radio.addEventListener('change', handleReceiptTypeChange); 
             });
-            prevMonthBtn.addEventListener('click', () => {
+            if (prevMonthBtn) prevMonthBtn.addEventListener('click', () => {
                 currentCalendarMonth--;
                 if (currentCalendarMonth < 0) {
                     currentCalendarMonth = 11;
@@ -1590,7 +1496,7 @@
                 }
                 renderCalendar();
             });
-            nextMonthBtn.addEventListener('click', () => {
+            if (nextMonthBtn) nextMonthBtn.addEventListener('click', () => {
                 currentCalendarMonth++;
                 if (currentCalendarMonth > 11) {
                     currentCalendarMonth = 0;
@@ -1599,47 +1505,47 @@
                 renderCalendar();
             });
             document.querySelectorAll('input[name="markType"]').forEach(radio => {
-                radio.addEventListener('change', (e) => {
+                if (radio) radio.addEventListener('change', (e) => { 
                     currentMarkType = e.target.value;
                 });
             });
-            clearMarkingButton.addEventListener('click', () => {
+            if (clearMarkingButton) clearMarkingButton.addEventListener('click', () => {
                 selectedAbsenceDates.clear();
                 selectedCertificateDates.clear();
                 renderCalendar();
                 updateReceiptDisplay(); 
                 showMessageModal("Marcações Limpas", "Todas as marcações de falta e atestado foram limpas.");
             });
-            generateReceiptButton.addEventListener('click', showConfirmationModal);
-            newEmployeeCpfInput.addEventListener('input', formatCpfInput);
-            addEmployeeButton.addEventListener('click', addEmployee);
-            // Removed export and import button listeners
-            // exportEmployeesButton.addEventListener('click', exportEmployeesToTxt); 
-            // importEmployeesButton.addEventListener('click', () => { 
-            //     importEmployeesFile.click(); 
-            // });
-            // importEmployeesFile.addEventListener('change', importEmployeesFromTxt); 
-            confirmButtonEl.addEventListener('click', () => {
+            if (generateReceiptButton) generateReceiptButton.addEventListener('click', showConfirmationModal);
+            if (newEmployeeCpfInput) newEmployeeCpfInput.addEventListener('input', formatCpfInput);
+            if (addEmployeeButton) addEmployeeButton.addEventListener('click', addEmployee);
+            if (exportEmployeesButton) exportEmployeesButton.addEventListener('click', exportEmployeesToTxt); 
+            if (importEmployeesButton && importEmployeesFile) { 
+                importEmployeesButton.addEventListener('click', () => { 
+                    importEmployeesFile.click(); 
+                });
+                importEmployeesFile.addEventListener('change', importEmployeesFromTxt); 
+            }
+            if (confirmButtonEl) confirmButtonEl.addEventListener('click', () => {
                 if (selectedEmployeeForReceipt) {
                     updateReceiptDisplay(); 
                 }
                 hideConfirmationModal();
             });
-            cancelButtonEl.addEventListener('click', hideConfirmationModal);
-            messageModalCloseButton.addEventListener('click', hideMessageModal);
-            confirmDeleteButton.addEventListener('click', async () => { // Made async to await Firestore delete
+            if (cancelButtonEl) cancelButtonEl.addEventListener('click', hideConfirmationModal);
+            if (messageModalCloseButton) messageModalCloseButton.addEventListener('click', hideMessageModal);
+            if (confirmDeleteButton) confirmDeleteButton.addEventListener('click', async () => { 
                 await performRemoveEmployee(employeeToDeleteCpf);
                 hideDeleteConfirmationModal();
             });
-            cancelDeleteButton.addEventListener('click', hideDeleteConfirmationModal);
+            if (cancelDeleteButton) cancelButtonEl.addEventListener('click', hideDeleteConfirmationModal);
 
-            // Initial setup calls
             const today = new Date();
             const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
             const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
 
-            startDateInput.value = firstDayOfMonth.toISOString().split('T')[0];
-            endDateInput.value = lastDayOfMonth.toISOString().split('T')[0];
+            if (startDateInput) startDateInput.value = firstDayOfMonth.toISOString().split('T')[0];
+            if (endDateInput) endDateInput.value = lastDayOfMonth.toISOString().split('T')[0];
             
             renderEmployeeList(); 
             handleReceiptTypeChange(); 
