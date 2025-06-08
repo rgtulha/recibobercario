@@ -135,7 +135,9 @@
             <h1 class="text-2xl font-bold text-stone-800 mb-1">Gerenciador de Recibos</h1>
             <p class="text-sm text-stone-500 mb-4">Siga os passos para gerar o recibo.</p>
             
-            <!-- Removed User ID Display - not needed for local storage -->
+            <div class="mb-4 text-xs text-stone-500">
+                ID do Usuário: <span id="userIdDisplay" class="font-semibold text-stone-700 break-all">Carregando...</span>
+            </div>
 
             <h2 class="text-lg font-semibold text-stone-700 mb-3">1. Selecione a Funcionária</h2>
             <div class="mt-2 mb-4">
@@ -234,6 +236,12 @@
                     Exportar Funcionárias (TXT)
                 </button>
             </div>
+            <div class="mt-2">
+                <input type="file" id="importEmployeesFile" accept=".txt" hidden>
+                <button id="importEmployeesButton" class="w-full px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors shadow-md">
+                    Importar Funcionárias (TXT)
+                </button>
+            </div>
 
         </aside>
 
@@ -246,7 +254,7 @@
             </div>
 
             <div id="receipt-content" class="hidden">
-                <div class="flex justify-between items-start mb-8"> <!-- Removed no-print from this div -->
+                <div class="flex justify-between items-start mb-8">
                     <h2 id="receipt-title" class="text-4xl font-bold text-stone-800">Recibo</h2>
                     <button onclick="window.print()" class="no-print px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors flex items-center gap-2 shadow-md">
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
@@ -347,9 +355,25 @@
         </div>
     </div>
 
-    <script>
-        // Data for employees (now a local array)
-        let employeeData = [
+    <script type="module">
+        // Firebase SDKs - Imported via script tags in the head for global access
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, query, onSnapshot, doc, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Firebase global variables
+        let app;
+        let db;
+        let auth;
+        let currentUserId = null;
+        let isAuthReady = false;
+
+        // App ID and Firebase Config are provided by the Canvas environment
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+
+        // Default employee data, used if Firestore is empty or loading fails
+        const defaultEmployeeData = [
             { nome: "ADRIANA GONÇALVES PEREIRA", cpf: "958.678.721-49" },
             { nome: "ADRIANA PEREIRA DA COSTA", cpf: "039.288.382-10" },
             { nome: "ALESSANDRA FERREIRA LEITE", cpf: "880.262.641-34" },
@@ -369,8 +393,7 @@
             { nome: "WATINA LORRAINE MARTINS", cpf: "058.233.501-98" }
         ];
 
-        // Sort employeeData alphabetically by nome
-        employeeData.sort((a, b) => a.nome.localeCompare(b.nome));
+        let employeeData = []; // This will be populated from Firestore
 
         // Detalhes base do recibo
         const receiptBaseDetails = {
@@ -424,6 +447,7 @@
         let internPeriodSelectEl;
         let receiptTitleEl;
         let receiptDateTopEl; 
+        let userIdDisplayEl; // Re-added element for user ID display
 
         // Elementos do calendário
         let calendarEl;
@@ -443,7 +467,10 @@
         let newEmployeeNameInput;
         let newEmployeeCpfInput;
         let addEmployeeButton;
-        let exportEmployeesButton; 
+        // Removed export and import buttons/file input as Firebase will handle persistence
+        // let exportEmployeesButton; 
+        // let importEmployeesButton; 
+        // let importEmployeesFile;  
 
         // Elementos do novo modal de confirmação de exclusão
         let deleteConfirmationModalEl;
@@ -451,13 +478,11 @@
         let cancelDeleteButton;
         let confirmDeleteButton;
 
-        // Removed paymentChart as it's no longer used
-        let currentReceiptNumber = 99; // This should ideally be stored persistently too
         let selectedEmployeeForReceipt = null;
         let calculatedWorkingDays = 0;
         let holidaysFoundInPeriod = [];
-        let selectedAbsenceDates = new Set(); // Global set for all marked dates
-        let selectedCertificateDates = new Set(); // Global set for all marked dates
+        let selectedAbsenceDates = new Set(); 
+        let selectedCertificateDates = new Set(); 
         let selectedReceiptType = 'valeTransporte';
         let currentCalendarMonth = new Date().getMonth();
         let currentCalendarYear = new Date().getFullYear();
@@ -466,6 +491,77 @@
 
         // Variable to control which period is active for calendar marking
         let calendarMarkablePeriod = { start: null, end: null };
+
+        /**
+         * Initializes Firebase and sets up authentication and Firestore listener.
+         */
+        async function initializeFirebase() {
+            try {
+                app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+
+                // Sign in with custom token if available, otherwise anonymously
+                const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                } else {
+                    await signInAnonymously(auth);
+                }
+
+                // Listen for auth state changes
+                onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        currentUserId = user.uid;
+                        userIdDisplayEl.textContent = currentUserId;
+                        isAuthReady = true;
+                        console.log("Firebase Auth Ready. User ID:", currentUserId);
+                        setupFirestoreListeners(); // Setup listeners after auth is ready
+                    } else {
+                        currentUserId = null;
+                        userIdDisplayEl.textContent = 'Não autenticado';
+                        isAuthReady = false;
+                        console.log("Firebase Auth Not Ready.");
+                        employeeData = []; // Clear data if not authenticated
+                        renderEmployeeList();
+                    }
+                });
+            } catch (error) {
+                console.error("Error initializing Firebase:", error);
+                showMessageModal("Erro de Inicialização", `Não foi possível conectar ao Firebase: ${error.message}`);
+            }
+        }
+
+        /**
+         * Sets up real-time listeners for employee data from Firestore.
+         * Data is stored in a public collection for this app.
+         */
+        function setupFirestoreListeners() {
+            if (!db || !currentUserId) {
+                console.warn("Firestore or User ID not available for listeners.");
+                return;
+            }
+            // Using a public collection path for shared employees
+            const employeesCollectionRef = collection(db, `artifacts/${appId}/public/data/employees`);
+            const q = query(employeesCollectionRef);
+
+            onSnapshot(q, (snapshot) => {
+                const employees = [];
+                snapshot.forEach((doc) => {
+                    employees.push({ id: doc.id, ...doc.data() });
+                });
+                employeeData = employees;
+                employeeData.sort((a, b) => a.nome.localeCompare(b.nome)); // Sort after fetching
+                console.log("Employee data updated from Firestore:", employeeData);
+                renderEmployeeList(searchInputEl.value); // Re-render with current search filter
+            }, (error) => {
+                console.error("Error fetching employee data from Firestore:", error);
+                showMessageModal("Erro de Dados", `Não foi possível carregar os dados das funcionárias: ${error.message}`);
+                // Fallback to default data if Firestore fails to load
+                employeeData = defaultEmployeeData.map(emp => ({ ...emp, nome: formatEmployeeName(emp.nome) })).sort((a, b) => a.nome.localeCompare(b.nome));
+                renderEmployeeList(searchInputEl.value);
+            });
+        }
 
         /**
          * Formats a numeric value to Brazilian currency (BRL).
@@ -558,9 +654,9 @@
             }
 
             let reaisText = getWordsPart(reaisNum);
-            if (reaisNum === 0 && centavosNum === 0) reaisText = "zero"; // Changed to "zero" for consistency
-            else if (reaisNum === 0) reaisText = ""; // If no reais, don't say "zero reais"
-            else reaisText += reaisNum === 1 ? " real" : " reais"; // Changed to lowercase for consistency
+            if (reaisNum === 0 && centavosNum === 0) reaisText = "zero"; 
+            else if (reaisNum === 0) reaisText = ""; 
+            else reaisText += reaisNum === 1 ? " real" : " reais"; 
 
             let centavosText = "";
             if (centavosNum > 0) {
@@ -568,7 +664,6 @@
                 centavosText += centavosNum === 1 ? " centavo" : " centavos";
             }
             
-            // Combine reais and centavos
             if (reaisNum > 0 && centavosNum > 0) {
                 return `${reaisText} e ${centavosText}`;
             } else if (centavosNum > 0) {
@@ -576,7 +671,7 @@
             } else if (reaisNum > 0) {
                 return reaisText;
             } else {
-                return "zero reais"; // Fallback for exactly 0.00
+                return "zero reais"; 
             }
         }
 
@@ -817,6 +912,11 @@
             if (!str) return '';
             return str.split(' ').map(word => {
                 if (word.length === 0) return '';
+                // Handle common conjunctions/prepositions in Portuguese
+                const lowerWord = word.toLowerCase();
+                if (['de', 'da', 'do', 'dos', 'das', 'e', 'em', 'com', 'sem', 'para', 'por'].includes(lowerWord)) {
+                    return lowerWord;
+                }
                 return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
             }).join(' ');
         }
@@ -856,9 +956,9 @@
 
                 // Add event listener for the delete button
                 const deleteButton = item.querySelector('button');
-                deleteButton.addEventListener('click', (event) => {
+                deleteButton.addEventListener('click', async (event) => { // Made async to await Firestore delete
                     event.stopPropagation(); // Prevent employee selection when clicking delete
-                    showDeleteConfirmationModal(employee.cpf, formatEmployeeName(employee.nome)); // Pass CPF as ID for local array
+                    showDeleteConfirmationModal(employee.id, formatEmployeeName(employee.nome)); // Pass Firestore doc ID
                 });
 
                 employeeListEl.appendChild(item);
@@ -952,9 +1052,14 @@
         }
 
         /**
-         * Adds a new employee to the local employeeData array.
+         * Adds a new employee to Firestore.
          */
-        function addEmployee() {
+        async function addEmployee() {
+            if (!isAuthReady || !currentUserId) {
+                showMessageModal("Erro de Autenticação", "Por favor, aguarde a autenticação para adicionar funcionárias.");
+                return;
+            }
+
             const name = newEmployeeNameInput.value.trim();
             const cpf = newEmployeeCpfInput.value.trim();
 
@@ -970,7 +1075,7 @@
                 return;
             }
 
-            // Check if CPF already exists
+            // Check if CPF already exists in current data
             if (employeeData.some(emp => emp.cpf === cpf)) {
                 showMessageModal("Erro de CPF", "Já existe uma funcionária com este CPF.");
                 return;
@@ -978,37 +1083,49 @@
             
             const capitalizedName = capitalizeWords(name);
 
-            employeeData.push({ nome: capitalizedName, cpf: cpf });
-            // Re-sort employeeData after adding a new employee
-            employeeData.sort((a, b) => a.nome.localeCompare(b.nome));
-            renderEmployeeList(); // Re-render the list to show the new employee
-            newEmployeeNameInput.value = '';
-            newEmployeeCpfInput.value = '';
-            showMessageModal("Sucesso", `Funcionária "${capitalizedName}" adicionada com sucesso!`);
+            try {
+                const employeesCollectionRef = collection(db, `artifacts/${appId}/public/data/employees`);
+                // Use the clean CPF as the document ID for uniqueness
+                const cleanCpf = cpf.replace(/\D/g, '');
+                await setDoc(doc(employeesCollectionRef, cleanCpf), { nome: capitalizedName, cpf: cpf });
+                
+                showMessageModal("Sucesso", `Funcionária "${capitalizedName}" adicionada com sucesso!`);
+                newEmployeeNameInput.value = '';
+                newEmployeeCpfInput.value = '';
+            } catch (error) {
+                console.error("Error adding employee to Firestore:", error);
+                showMessageModal("Erro ao Adicionar", `Não foi possível adicionar a funcionária: ${error.message}`);
+            }
         }
 
         /**
-         * Removes an employee from the local employeeData array after confirmation.
-         * @param {string} employeeCpf - The CPF of the employee to delete.
+         * Removes an employee from Firestore after confirmation.
+         * @param {string} employeeId - The Firestore document ID of the employee to delete (which is the clean CPF).
          */
-        function performRemoveEmployee(employeeCpf) {
-            const initialLength = employeeData.length;
-            employeeData = employeeData.filter(emp => emp.cpf !== employeeCpf);
-            
-            if (employeeData.length < initialLength) {
-                // No need to re-sort here, as filter maintains order.
-                renderEmployeeList(); // Re-render the list after removal
+        async function performRemoveEmployee(employeeId) {
+            if (!isAuthReady || !currentUserId) {
+                showMessageModal("Erro de Autenticação", "Por favor, aguarde a autenticação para remover funcionárias.");
+                return;
+            }
+            if (!employeeId) return;
+
+            try {
+                const employeeDocRef = doc(db, `artifacts/${appId}/public/data/employees`, employeeId);
+                await deleteDoc(employeeDocRef);
+                
                 // If the removed employee was the selected one, clear selection
-                if (selectedEmployeeForReceipt && selectedEmployeeForReceipt.cpf === employeeCpf) {
+                if (selectedEmployeeForReceipt && selectedEmployeeForReceipt.id === employeeId) {
                     selectedEmployeeForReceipt = null;
                     receiptContentEl.classList.add('hidden');
                     welcomeMessageEl.classList.remove('hidden');
                 }
                 showMessageModal("Sucesso", `Funcionária removida com sucesso!`);
-            } else {
-                showMessageModal("Erro", "Funcionária não encontrada.");
+            } catch (error) {
+                console.error("Error removing employee from Firestore:", error);
+                showMessageModal("Erro ao Remover", `Não foi possível remover a funcionária: ${error.message}`);
+            } finally {
+                employeeToDeleteCpf = null; // Clear the temporary storage
             }
-            employeeToDeleteCpf = null; // Clear the temporary storage
         }
 
         /**
@@ -1099,12 +1216,12 @@
 
         /**
          * Displays the delete confirmation modal.
-         * @param {string} employeeCpf - The CPF of the employee to delete.
-         * @param {string} employeeName - The name of the employee to delete.
+         * @param {string} employeeId - The Firestore document ID (clean CPF) of the employee to delete.
+         * @param {string} employeeName - The formatted name of the employee to delete.
          */
-        function showDeleteConfirmationModal(employeeCpf, employeeName) {
-            employeeToDeleteCpf = employeeCpf; // Store the CPF temporarily
-            deleteEmployeeNameEl.textContent = employeeName; // Already formatted by renderEmployeeList
+        function showDeleteConfirmationModal(employeeId, employeeName) {
+            employeeToDeleteCpf = employeeId; // Store the ID temporarily
+            deleteEmployeeNameEl.textContent = employeeName; 
             deleteConfirmationModalEl.classList.remove('hidden');
         }
 
@@ -1133,9 +1250,9 @@
 
             let totalValue = 0; 
             let periodText = '';
-            let totalWordsLabelText = 'Valor total à receber:'; // Default for new requirements, includes accent
+            let totalWordsLabelText = 'Valor total à receber:'; 
             let dailyValueHtml = '';
-            let additionalInfo = ''; // For holidays, absences, certificates info
+            let additionalInfo = ''; 
 
             const receiptPeriodStartDate = new Date(startDateInput.value + 'T00:00:00');
             const receiptPeriodEndDate = new Date(endDateInput.value + 'T00:00:00');
@@ -1146,21 +1263,17 @@
             const { effectiveDays, absenceDaysCount, certificateDaysCount, holidaysInPeriod } = 
                 calculateDaysForPeriod(receiptPeriodStartDate, receiptPeriodEndDate, selectedAbsenceDates, selectedCertificateDates);
             
-            // Always show holidays for the main receipt period
             if (holidaysInPeriod.length > 0) {
                 additionalInfo += `<strong>Feriado(s) no período:</strong><br>${holidaysInPeriod.map(h => `- ${formatDate(h.date)}: ${h.name}`).join('<br>')}`;
             }
 
             if (selectedReceiptType === 'valeTransporte') {
-                // Calculate previous month's dates for absences/certificates affecting VT
                 const prevMonthStartDate = new Date(receiptPeriodStartDate.getFullYear(), receiptPeriodStartDate.getMonth() - 1, 1);
                 const prevMonthEndDate = new Date(receiptPeriodStartDate.getFullYear(), receiptPeriodStartDate.getMonth(), 0);
 
-                // Get absences and certificates from the previous month's markings
                 const prevMonthAbsences = getMarkedDatesInSpecificMonth(selectedAbsenceDates, prevMonthStartDate.getFullYear(), prevMonthStartDate.getMonth());
                 const prevMonthCertificates = getMarkedDatesInSpecificMonth(selectedCertificateDates, prevMonthStartDate.getFullYear(), prevMonthStartDate.getMonth());
 
-                // Calculate total possible working days in the *current* receipt month (without current month's marked absences/certs)
                 let totalPossibleWorkingDaysInCurrentMonth = 0;
                 const tempDate = new Date(receiptPeriodStartDate);
                 while (tempDate <= receiptPeriodEndDate) {
@@ -1174,48 +1287,36 @@
                     tempDate.setDate(tempDate.getDate() + 1);
                 }
                 
-                // --- CALCULATION FOR VALE TRANSPORTE ---
                 let baseValue = totalPossibleWorkingDaysInCurrentMonth * receiptBaseDetails.dailyValue;
                 let deduction = (prevMonthAbsences.size + prevMonthCertificates.size) * receiptBaseDetails.dailyValue;
                 totalValue = baseValue - deduction;
-                // --- END CALCULATION ---
 
                 document.getElementById('receipt-description').textContent = "REFERENTE AO VALE TRANSPORTE";
-                
-                // --- Period Text for Vale Transporte ---
                 periodText = `<strong>Período:</strong> ${totalPossibleWorkingDaysInCurrentMonth} dias úteis efetivos do mês de ${receiptPeriodMonthName} (${formatDate(startDateInput.value)} até ${formatDate(endDateInput.value)}).`;
-                // --- End Period Text ---
-
                 dailyValueHtml = `<strong>Valor Diário:</strong> ${formatCurrency(receiptBaseDetails.dailyValue)} (${numberToWords(receiptBaseDetails.dailyValue)})`;
                 
-                // Get previous month's name for description
                 const prevMonthNameForDisplay = monthNames[prevMonthStartDate.getMonth()];
 
-                // List previous month absences/certs in additionalInfo using previous month's name
                 if (prevMonthAbsences.size > 0) {
                     additionalInfo += (additionalInfo ? '<br><br>' : '') + `<strong>Falta(s) referente(s) ao mês de ${prevMonthNameForDisplay}:</strong><br>${Array.from(prevMonthAbsences).sort().map(d => `- ${formatDate(d)}`).join('<br>')}`;
                 }
                 if (prevMonthCertificates.size > 0) {
                     additionalInfo += (additionalInfo ? '<br><br>' : '') + `<strong>Atestado(s) referente(s) ao mês de ${prevMonthNameForDisplay}:</strong><br>${Array.from(prevMonthCertificates).sort().map(d => `- ${formatDate(d)}`).join('<br>')}`;
                 }
-                totalWordsLabelText = 'Valor total à receber:'; // Specific for VT
 
             } else if (selectedReceiptType === 'salarioEstagiario') {
                 const monthlyAllowance = receiptBaseDetails.monthlyAllowance;
-                const fixedDivisorForAbsence = 30; // Always divide by 30 for salary discount
+                const fixedDivisorForAbsence = 30;
                 const dailyAllowance = monthlyAllowance / fixedDivisorForAbsence;
-                totalValue = monthlyAllowance - (absenceDaysCount * dailyAllowance); // absenceDaysCount are for current period
+                totalValue = monthlyAllowance - (absenceDaysCount * dailyAllowance); 
                 document.getElementById('receipt-description').textContent = `REFERENTE À BOLSA ESTÁGIO (${internPeriodSelectEl.value === 'matutino' ? 'Período Matutino' : 'Período Vespertino'})`;
                 
-                // --- Period Text for Salário Estagiário (with selected period type) ---
                 const internPeriodDisplay = internPeriodSelectEl.value === 'matutino' ? 'Matutino' : 'Vespertino';
                 periodText = `<strong>Período:</strong> dias trabalhados do mês de ${receiptPeriodMonthName} (${internPeriodDisplay}) (${formatDate(startDateInput.value)} até ${formatDate(endDateInput.value)}).`;
-                // --- End Updated Period Text ---
                 
                 dailyValueHtml = `<strong>Valor Fixo Mensal:</strong> ${formatCurrency(receiptBaseDetails.monthlyAllowance)} (${numberToWords(receiptBaseDetails.monthlyAllowance)})`;
-                totalWordsLabelText = 'Valor Total à receber:'; // Specific for Salário Estagiário
+                totalWordsLabelText = 'Valor Total à receber:'; 
 
-                // List current period absences/certs in additionalInfo
                 if (absenceDaysCount > 0) {
                     additionalInfo += (additionalInfo ? '<br><br>' : '') + `<strong>Dia(s) de Falta:</strong><br>${Array.from(selectedAbsenceDates).filter(d => {
                         const date = new Date(d + 'T00:00:00');
@@ -1230,23 +1331,19 @@
                 }
 
             } else if (selectedReceiptType === 'bonificacao') {
-                // --- NEW LOGIC for Bonificação: Value is 0 if there are absences/certificates ---
                 if (absenceDaysCount > 0 || certificateDaysCount > 0) {
-                    totalValue = 0; // Set to zero if there's any absence or certificate in the current period
+                    totalValue = 0; 
                 } else {
                     totalValue = receiptBaseDetails.fixedBonusAmount; 
                 }
-                // --- END NEW LOGIC ---
 
                 document.getElementById('receipt-description').textContent = `REFERENTE À BONIFICAÇÃO`;
                 
-                // Period Text for Bonificação (original format) - NO DIAS ÚTEIS EFETIVOS
                 periodText = `<strong>Período:</strong> dias trabalhados do mês de ${receiptPeriodMonthName} (${formatDate(startDateInput.value)} até ${formatDate(endDateInput.value)}).`;
                 
                 dailyValueHtml = `<strong>Valor Fixo Mensal:</strong> ${formatCurrency(receiptBaseDetails.fixedBonusAmount)} (${numberToWords(receiptBaseDetails.fixedBonusAmount)})`; 
-                totalWordsLabelText = 'Valor total à receber:'; // Specific for Bonificação
+                totalWordsLabelText = 'Valor total à receber:'; 
                 
-                // List current period absences/certs in additionalInfo
                 if (absenceDaysCount > 0) {
                     additionalInfo += (additionalInfo ? '<br><br>' : '') + `<strong>Dia(s) de Falta:</strong><br>${Array.from(selectedAbsenceDates).filter(d => {
                         const date = new Date(d + 'T00:00:00');
@@ -1273,7 +1370,7 @@
             document.getElementById('receipt-total').textContent = formatCurrency(totalValue);
             document.getElementById('receipt-payer').textContent = receiptBaseDetails.payer;
             document.getElementById('receipt-cnpj').textContent = `CNPJ: ${receiptBaseDetails.cnpj}`;
-            document.getElementById('employee-name').textContent = formatEmployeeName(selectedEmployeeForReceipt.nome); // Formatted name
+            document.getElementById('employee-name').textContent = formatEmployeeName(selectedEmployeeForReceipt.nome); 
             document.getElementById('employee-cpf').textContent = selectedEmployeeForReceipt.cpf;
             
             document.getElementById('receipt-period-info').innerHTML = periodText;
@@ -1282,9 +1379,8 @@
 
             document.getElementById('receipt-total-words-label').textContent = totalWordsLabelText;
             document.getElementById('receipt-total-words').textContent = words; 
-            document.getElementById('employee-signature-name').textContent = formatEmployeeName(selectedEmployeeForReceipt.nome); // Formatted name
+            document.getElementById('employee-signature-name').textContent = formatEmployeeName(selectedEmployeeForReceipt.nome); 
             
-            // --- Update Receipt Titles ---
             if (selectedReceiptType === 'valeTransporte') {
                 receiptTitleEl.textContent = "Recibo de vale transporte";
             } else if (selectedReceiptType === 'salarioEstagiario') {
@@ -1292,9 +1388,8 @@
             } else if (selectedReceiptType === 'bonificacao') {
                 receiptTitleEl.textContent = "Recibo de bonificação";
             } else {
-                receiptTitleEl.textContent = "Recibo"; // Default fallback
+                receiptTitleEl.textContent = "Recibo"; 
             }
-            // --- End Update Receipt Titles ---
         }
 
         // Removed the updateChart function as it's no longer used.
@@ -1308,24 +1403,112 @@
          * Exports employee data to a plain text file for download.
          */
         function exportEmployeesToTxt() {
-            let csvContent = "Nome,CPF\n"; // Header row
+            let csvContent = "Nome,CPF\n"; 
             employeeData.forEach(employee => {
-                csvContent += `${formatEmployeeName(employee.nome)},${employee.cpf}\n`; // Format name for export
+                csvContent += `${formatEmployeeName(employee.nome)},${employee.cpf}\n`; 
             });
 
             const blob = new Blob([csvContent], { type: 'text/plain;charset=utf-8;' });
             const link = document.createElement('a');
             link.href = URL.createObjectURL(blob);
-            link.download = 'funcionarias.txt'; // Suggested filename
-            document.body.appendChild(link); // Required for Firefox
-            link.click(); // Trigger download
-            document.body.removeChild(link); // Clean up
-            URL.revokeObjectURL(link.href); // Release object URL
+            link.download = 'funcionarias.txt'; 
+            document.body.appendChild(link); 
+            link.click(); 
+            document.body.removeChild(link); 
+            URL.revokeObjectURL(link.href); 
             showMessageModal("Exportação Concluída", "Os dados das funcionárias foram exportados para 'funcionarias.txt'. Você pode encontrar o arquivo na sua pasta de downloads.");
+        }
+
+        /**
+         * Imports employee data from a selected plain text file.
+         */
+        function importEmployeesFromTxt(event) {
+            const file = event.target.files[0];
+            if (!file) {
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const content = e.target.result;
+                const lines = content.split('\n').filter(line => line.trim() !== '' && !line.startsWith('Nome,CPF')); 
+                const importedData = [];
+                let hasError = false;
+
+                lines.forEach(line => {
+                    const parts = line.split(',');
+                    if (parts.length === 2) {
+                        const nome = parts[0].trim();
+                        const cpf = parts[1].trim();
+                        const cpfRegex = /^\d{3}\.\d{3}\.\d{3}-\d{2}$/;
+                        if (cpfRegex.test(cpf)) {
+                             importedData.push({ nome: formatEmployeeName(nome), cpf: cpf });
+                        } else {
+                            hasError = true;
+                            console.warn(`Skipping invalid CPF format in line: ${line}`);
+                        }
+                    } else {
+                        hasError = true;
+                        console.warn(`Skipping malformed line in TXT: ${line}`);
+                    }
+                });
+
+                if (importedData.length > 0) {
+                    // Overwrite current data with imported data
+                    employeeData = importedData; 
+                    employeeData.sort((a, b) => a.nome.localeCompare(b.nome)); 
+                    renderEmployeeList(); 
+                    showMessageModal("Importação Concluída", `Funcionárias importadas com sucesso! ${hasError ? "Algumas linhas com formato inválido foram ignoradas." : ""}`);
+                } else if (hasError) {
+                    showMessageModal("Erro na Importação", "Nenhuma funcionária válida foi encontrada no arquivo ou o arquivo está vazio/malformado.");
+                } else {
+                    showMessageModal("Importação", "Nenhum dado encontrado para importar ou o arquivo está vazio.");
+                }
+            };
+            reader.readAsText(file); 
+        }
+
+        /**
+         * Loads employee data from Firestore.
+         * Falls back to defaultEmployeeData if loading fails or Firestore is empty.
+         * @returns {Promise<Array<Object>>} A promise that resolves with the employee data.
+         */
+        async function loadEmployeesFromFirestore() {
+            try {
+                const employeesCollectionRef = collection(db, `artifacts/${appId}/public/data/employees`);
+                const q = query(employeesCollectionRef);
+                const querySnapshot = await getDocs(q); // Use getDocs for a one-time fetch on load
+
+                const loadedData = [];
+                querySnapshot.forEach(doc => {
+                    loadedData.push({ id: doc.id, ...doc.data() });
+                });
+
+                if (loadedData.length === 0) {
+                    console.warn("Firestore collection is empty. Initializing with default data.");
+                    // Add default data to Firestore if it's empty
+                    for (const emp of defaultEmployeeData) {
+                        const cleanCpf = emp.cpf.replace(/\D/g, '');
+                        await setDoc(doc(employeesCollectionRef, cleanCpf), emp);
+                    }
+                    // Fetch again to get the newly added default data with IDs
+                    const newQuerySnapshot = await getDocs(q);
+                    newQuerySnapshot.forEach(doc => {
+                        loadedData.push({ id: doc.id, ...doc.data() });
+                    });
+                }
+
+                loadedData.sort((a, b) => a.nome.localeCompare(b.nome));
+                return loadedData;
+            } catch (error) {
+                console.error('Error loading employees from Firestore or initializing with default:', error);
+                showMessageModal("Erro de Carregamento", `Não foi possível carregar as funcionárias do banco de dados: ${error.message}. Carregando dados padrão.`);
+                return defaultEmployeeData.map(emp => ({ ...emp, nome: formatEmployeeName(emp.nome) })).sort((a, b) => a.nome.localeCompare(b.nome));
+            }
         }
         
         // Initialize the app on window load
-        window.onload = () => {
+        window.onload = async () => {
             // DOM element references
             employeeListEl = document.getElementById('employeeList');
             searchInputEl = document.getElementById('searchInput');
@@ -1349,6 +1532,7 @@
             internPeriodSelectEl = document.getElementById('internPeriod');
             receiptTitleEl = document.getElementById('receipt-title');
             receiptDateTopEl = document.getElementById('receipt-date-top'); 
+            userIdDisplayEl = document.getElementById('userIdDisplay'); // Get reference to userIdDisplay
 
             // Elementos do calendário
             calendarEl = document.getElementById('calendar');
@@ -1368,31 +1552,33 @@
             newEmployeeNameInput = document.getElementById('newEmployeeName');
             newEmployeeCpfInput = document.getElementById('newEmployeeCpf');
             addEmployeeButton = document.getElementById('addEmployeeButton');
-            exportEmployeesButton = document.getElementById('exportEmployeesButton'); 
+            // Removed export and import buttons/file input as Firebase will handle persistence
+            // exportEmployeesButton = document.getElementById('exportEmployeesButton'); 
+            // importEmployeesButton = document.getElementById('importEmployeesButton'); 
+            // importEmployeesFile = document.getElementById('importEmployeesFile'); 
 
-            // Elementos do novo modal de confirmação de exclusão
+            // Elements for delete confirmation modal
             deleteConfirmationModalEl = document.getElementById('deleteConfirmationModal');
             deleteEmployeeNameEl = document.getElementById('deleteEmployeeName');
             cancelDeleteButton = document.getElementById('cancelDeleteButton');
             confirmDeleteButton = document.getElementById('confirmDeleteButton'); 
 
-            // Event listener attachments - moved inside window.onload
+            // Initialize Firebase and load employee data
+            await initializeFirebase(); // Initialize Firebase first
+
+            // Event listener attachments
             searchInputEl.addEventListener('keyup', (e) => renderEmployeeList(e.target.value));
             startDateInput.addEventListener('change', () => {
-                // Clear existing markings if the main period changes, as their relevance might shift
                 selectedAbsenceDates.clear(); 
                 selectedCertificateDates.clear(); 
-                // Then update the calendar and receipt display based on new dates and current receipt type
-                handleReceiptTypeChange(); // This will handle calendar month/year and marking period update
+                handleReceiptTypeChange(); 
             });
             endDateInput.addEventListener('change', () => {
-                // Clear existing markings if the main period changes, as their relevance might shift
                 selectedAbsenceDates.clear(); 
                 selectedCertificateDates.clear(); 
-                // Then update the calendar and receipt display based on new dates and current receipt type
-                handleReceiptTypeChange(); // This will handle calendar month/year and marking period update
+                handleReceiptTypeChange(); 
             });
-            calculateDaysButtonEl.addEventListener('click', updateReceiptDisplay); // Changed to updateReceiptDisplay
+            calculateDaysButtonEl.addEventListener('click', updateReceiptDisplay); 
             document.querySelectorAll('input[name="receiptType"]').forEach(radio => {
                 radio.addEventListener('change', handleReceiptTypeChange);
             });
@@ -1421,23 +1607,28 @@
                 selectedAbsenceDates.clear();
                 selectedCertificateDates.clear();
                 renderCalendar();
-                updateReceiptDisplay(); // Update receipt after clearing
+                updateReceiptDisplay(); 
                 showMessageModal("Marcações Limpas", "Todas as marcações de falta e atestado foram limpas.");
             });
             generateReceiptButton.addEventListener('click', showConfirmationModal);
             newEmployeeCpfInput.addEventListener('input', formatCpfInput);
             addEmployeeButton.addEventListener('click', addEmployee);
-            exportEmployeesButton.addEventListener('click', exportEmployeesToTxt); // Attach export listener
+            // Removed export and import button listeners
+            // exportEmployeesButton.addEventListener('click', exportEmployeesToTxt); 
+            // importEmployeesButton.addEventListener('click', () => { 
+            //     importEmployeesFile.click(); 
+            // });
+            // importEmployeesFile.addEventListener('change', importEmployeesFromTxt); 
             confirmButtonEl.addEventListener('click', () => {
                 if (selectedEmployeeForReceipt) {
-                    updateReceiptDisplay(); // Final update on confirm
+                    updateReceiptDisplay(); 
                 }
                 hideConfirmationModal();
             });
             cancelButtonEl.addEventListener('click', hideConfirmationModal);
             messageModalCloseButton.addEventListener('click', hideMessageModal);
-            confirmDeleteButton.addEventListener('click', () => {
-                performRemoveEmployee(employeeToDeleteCpf);
+            confirmDeleteButton.addEventListener('click', async () => { // Made async to await Firestore delete
+                await performRemoveEmployee(employeeToDeleteCpf);
                 hideDeleteConfirmationModal();
             });
             cancelDeleteButton.addEventListener('click', hideDeleteConfirmationModal);
@@ -1450,8 +1641,7 @@
             startDateInput.value = firstDayOfMonth.toISOString().split('T')[0];
             endDateInput.value = lastDayOfMonth.toISOString().split('T')[0];
             
-            renderEmployeeList(); // Initial render of the employee list
-            // Call handleReceiptTypeChange to correctly set up initial calendar state and receipt display
+            renderEmployeeList(); 
             handleReceiptTypeChange(); 
         };
 
