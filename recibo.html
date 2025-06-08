@@ -350,8 +350,7 @@
                 <button id="cancelDeleteButton" class="px-4 py-2 text-stone-700 bg-stone-200 rounded-lg hover:bg-stone-300 transition-colors shadow-sm">Cancelar</button>
                 <button id="confirmDeleteButton" class="px-4 py-2 text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors shadow-md">Excluir</button>
             </div>
-        </div>
-    </div >
+        </div >
 
     <script type="module">
         // Firebase SDKs - Imported via script tags in the head for global access
@@ -368,7 +367,6 @@
 
         // App ID and Firebase Config are provided by the Canvas environment
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        // The Firebase config comes from the environment, do NOT hardcode it here.
         const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
 
         // Default employee data, used if Firestore is empty or loading fails
@@ -429,7 +427,9 @@
             workingDaysInfoEl, calculateDaysButtonEl, holidaysInPeriodEl, calculateDaysButtonContainerEl,
             periodInfoContainerEl, confirmationModalEl, modalEmployeeNameEl, confirmButtonEl, cancelButtonEl,
             receiptTypeSelectionEl, internPeriodContainerEl, internPeriodSelectEl, receiptTitleEl, receiptDateTopEl,
-            userIdDisplayEl, calendarEl, currentMonthYearEl, prevMonthBtn, nextMonthBtn, clearMarkingButton,
+            // userIdDisplayEl is removed from HTML, so no need to getElementById for it.
+            // userIdDisplayEl,
+            calendarEl, currentMonthYearEl, prevMonthBtn, nextMonthBtn, clearMarkingButton,
             generateReceiptButton, messageModalEl, messageModalTitleEl, messageModalContentEl, messageModalCloseButton,
             newEmployeeNameInput, newEmployeeCpfInput, addEmployeeButton, deleteConfirmationModalEl,
             deleteEmployeeNameEl, cancelDeleteButton, confirmDeleteButton, exportEmployeesButton, importEmployeesButton, importEmployeesFile; 
@@ -466,13 +466,13 @@
                 onAuthStateChanged(auth, (user) => {
                     if (user) {
                         currentUserId = user.uid;
-                        if (userIdDisplayEl) userIdDisplayEl.textContent = currentUserId; 
+                        // Removed userIdDisplayEl.textContent update here.
                         isAuthReady = true;
                         console.log("Firebase Auth Ready. User ID:", currentUserId);
                         setupFirestoreListeners(); 
                     } else {
                         currentUserId = null;
-                        if (userIdDisplayEl) userIdDisplayEl.textContent = 'Não autenticado'; 
+                        // Removed userIdDisplayEl.textContent update here.
                         isAuthReady = false;
                         console.log("Firebase Auth Not Ready.");
                         employeeData = []; 
@@ -1440,7 +1440,8 @@
             internPeriodSelectEl = document.getElementById('internPeriod');
             receiptTitleEl = document.getElementById('receipt-title');
             receiptDateTopEl = document.getElementById('receipt-date-top'); 
-            userIdDisplayEl = document.getElementById('userIdDisplay'); 
+            // userIdDisplayEl is removed from HTML, so no need to getElementById for it.
+            // userIdDisplayEl = document.getElementById('userIdDisplay'); // This line was removed as the HTML element was removed.
 
             calendarEl = document.getElementById('calendar');
             currentMonthYearEl = document.getElementById('currentMonthYear');
@@ -1550,4 +1551,4 @@
 
     </script>
 </body>
-</ht
+</html>
