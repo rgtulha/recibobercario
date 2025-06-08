@@ -365,9 +365,21 @@
         let currentUserId = null;
         let isAuthReady = false;
 
-        // App ID and Firebase Config are provided by the Canvas environment
+        // App ID (injetado pelo Canvas)
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        // Configuração do Firebase (injetada pelo Canvas)
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
+            // Se __firebase_config NÃO for definida (fora do Canvas), use esta config para DEPURAR.
+            // Para produção no Canvas, remova este bloco hardcoded.
+            apiKey: "AIzaSyAFbb0gWQ51vF92rN-Vis39FHqRAWbzhKE",
+            authDomain: "funcionarias-503a4.firebaseapp.com",
+            projectId: "funcionarias-503a4",
+            storageBucket: "funcionarias-503a4.firebasestorage.app",
+            messagingSenderId: "486757099128",
+            appId: "1:486757099128:web:e4d8c17b61e20d8e2cef8d",
+            measurementId: "G-14N4JL3PGC"
+        };
+        
 
         // Default employee data, used if Firestore is empty or loading fails
         const defaultEmployeeData = [
@@ -1052,7 +1064,7 @@
 
             const startDate = new Date(startDateValue + 'T00:00:00');
             const endDate = new Date(endDateValue + 'T00:00:00');
-            if (isNaN(startDate) || isNaN(endDate) || startDate.getMonth() !== endDate.getMonth() || startDate.getFullYear() !== endDate.getFullYear()) { // Removed startDate > endDate check as calculateDaysForPeriod already handles invalid ranges
+            if (isNaN(startDate) || isNaN(endDate) || startDate.getMonth() !== endDate.getMonth() || startDate.getFullYear() !== endDate.getFullYear()) { 
                 showMessageModal("Erro de Período", "Por favor, selecione um período válido e que esteja contido no mesmo mês antes de gerar um recibo.");
                 return;
             }
