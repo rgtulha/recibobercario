@@ -1052,7 +1052,7 @@
 
             const startDate = new Date(startDateValue + 'T00:00:00');
             const endDate = new Date(endDateValue + 'T00:00:00');
-            if (isNaN(startDate) || isNaN(endDate) || startDate > endDate || startDate.getMonth() !== endDate.getMonth() || startDate.getFullYear() !== endDate.getFullYear()) {
+            if (isNaN(startDate) || isNaN(endDate) || startDate.getMonth() !== endDate.getMonth() || startDate.getFullYear() !== endDate.getFullYear()) { // Removed startDate > endDate check as calculateDaysForPeriod already handles invalid ranges
                 showMessageModal("Erro de Período", "Por favor, selecione um período válido e que esteja contido no mesmo mês antes de gerar um recibo.");
                 return;
             }
@@ -1394,18 +1394,6 @@
                     loadedData.push({ id: doc.id, ...doc.data() });
                 });
 
-                // Removed the block that automatically inserts default data if the collection is empty.
-                // if (loadedData.length === 0) {
-                //     console.warn("Firestore collection is empty. Initializing with default data.");
-                //     for (const emp of defaultEmployeeData) {
-                //         const cleanCpf = emp.cpf.replace(/\D/g, '');
-                //         await setDoc(doc(employeesCollectionRef, cleanCpf), emp);
-                //     }
-                //     const newQuerySnapshot = await getDocs(q);
-                //     newQuerySnapshot.forEach(doc => {
-                //         loadedData.push({ id: doc.id, ...doc.data() });
-                //     });
-                // }
                 loadedData.sort((a, b) => a.nome.localeCompare(b.nome));
                 return loadedData;
             } catch (error) {
@@ -1550,4 +1538,4 @@
 
     </script>
 </body>
-</ht
+</html>
