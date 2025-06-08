@@ -135,9 +135,7 @@
             <h1 class="text-2xl font-bold text-stone-800 mb-1">Gerenciador de Recibos</h1>
             <p class="text-sm text-stone-500 mb-4">Siga os passos para gerar o recibo.</p>
             
-            <div class="mb-4 text-xs text-stone-500">
-                ID do Usuário: <span id="userIdDisplay" class="font-semibold text-stone-700 break-all">Carregando...</span>
-            </div>
+            <!-- Removed ID do Usuário: <span id="userIdDisplay"> -->
 
             <h2 class="text-lg font-semibold text-stone-700 mb-3">1. Selecione a Funcionária</h2>
             <div class="mt-2 mb-4">
@@ -1143,7 +1141,6 @@
             if (!selectedEmployeeForReceipt || !receiptContentEl || !welcomeMessageEl || !receiptDateTopEl) {
                 if (receiptContentEl) receiptContentEl.classList.add('hidden');
                 if (welcomeMessageEl) welcomeMessageEl.classList.remove('hidden');
-                // console.error("Erro: Elementos essenciais do recibo não foram encontrados no DOM ao tentar atualizar a exibição."); // Removed console.error
                 return;
             }
 
@@ -1453,7 +1450,7 @@
             generateReceiptButton = document.getElementById('generateReceiptButton');
 
             messageModalEl = document.getElementById('messageModal');
-            messageModalTitleEl = document.getElementById('messageModalTitle'); // Corrected assignment
+            messageModalTitleEl = document.getElementById('messageModalTitle'); 
             messageModalContentEl = document.getElementById('messageModalContent');
             messageModalCloseButton = document.getElementById('messageModalCloseButton');
 
@@ -1553,4 +1550,4 @@
 
     </script>
 </body>
-</html>
+</ht
