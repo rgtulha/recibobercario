@@ -427,8 +427,7 @@
             workingDaysInfoEl, calculateDaysButtonEl, holidaysInPeriodEl, calculateDaysButtonContainerEl,
             periodInfoContainerEl, confirmationModalEl, modalEmployeeNameEl, confirmButtonEl, cancelButtonEl,
             receiptTypeSelectionEl, internPeriodContainerEl, internPeriodSelectEl, receiptTitleEl, receiptDateTopEl,
-            // userIdDisplayEl is removed from HTML, so no need to getElementById for it.
-            // userIdDisplayEl,
+            // userIdDisplayEl is removed from HTML, so no longer needed here.
             calendarEl, currentMonthYearEl, prevMonthBtn, nextMonthBtn, clearMarkingButton,
             generateReceiptButton, messageModalEl, messageModalTitleEl, messageModalContentEl, messageModalCloseButton,
             newEmployeeNameInput, newEmployeeCpfInput, addEmployeeButton, deleteConfirmationModalEl,
@@ -466,13 +465,13 @@
                 onAuthStateChanged(auth, (user) => {
                     if (user) {
                         currentUserId = user.uid;
-                        // Removed userIdDisplayEl.textContent update here.
+                        // userIdDisplayEl removed from HTML, so no need to update it here.
                         isAuthReady = true;
                         console.log("Firebase Auth Ready. User ID:", currentUserId);
                         setupFirestoreListeners(); 
                     } else {
                         currentUserId = null;
-                        // Removed userIdDisplayEl.textContent update here.
+                        // userIdDisplayEl removed from HTML, so no need to update it here.
                         isAuthReady = false;
                         console.log("Firebase Auth Not Ready.");
                         employeeData = []; 
@@ -1395,17 +1394,18 @@
                     loadedData.push({ id: doc.id, ...doc.data() });
                 });
 
-                if (loadedData.length === 0) {
-                    console.warn("Firestore collection is empty. Initializing with default data.");
-                    for (const emp of defaultEmployeeData) {
-                        const cleanCpf = emp.cpf.replace(/\D/g, '');
-                        await setDoc(doc(employeesCollectionRef, cleanCpf), emp);
-                    }
-                    const newQuerySnapshot = await getDocs(q);
-                    newQuerySnapshot.forEach(doc => {
-                        loadedData.push({ id: doc.id, ...doc.data() });
-                    });
-                }
+                // Removed the block that automatically inserts default data if the collection is empty.
+                // if (loadedData.length === 0) {
+                //     console.warn("Firestore collection is empty. Initializing with default data.");
+                //     for (const emp of defaultEmployeeData) {
+                //         const cleanCpf = emp.cpf.replace(/\D/g, '');
+                //         await setDoc(doc(employeesCollectionRef, cleanCpf), emp);
+                //     }
+                //     const newQuerySnapshot = await getDocs(q);
+                //     newQuerySnapshot.forEach(doc => {
+                //         loadedData.push({ id: doc.id, ...doc.data() });
+                //     });
+                // }
                 loadedData.sort((a, b) => a.nome.localeCompare(b.nome));
                 return loadedData;
             } catch (error) {
@@ -1441,7 +1441,6 @@
             receiptTitleEl = document.getElementById('receipt-title');
             receiptDateTopEl = document.getElementById('receipt-date-top'); 
             // userIdDisplayEl is removed from HTML, so no need to getElementById for it.
-            // userIdDisplayEl = document.getElementById('userIdDisplay'); // This line was removed as the HTML element was removed.
 
             calendarEl = document.getElementById('calendar');
             currentMonthYearEl = document.getElementById('currentMonthYear');
