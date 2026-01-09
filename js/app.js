@@ -80,7 +80,6 @@ function cacheDOM() {
     ids.forEach(id => {
         const el = document.getElementById(id);
         if (el) DOM[id] = el;
-        // else console.warn(`Elemento não encontrado: ${id}`); // Comentado para limpar console
     });
 
     DOM.receiptTypeRadios = document.querySelectorAll('input[name="receiptType"]');
@@ -267,11 +266,11 @@ function renderEmployeeList() {
     });
 }
 
-// --- CALENDÁRIO (LÓGICA CORRIGIDA) ---
+// --- CALENDÁRIO ---
 function updateCalendarContext() {
     let start;
     
-    // CORREÇÃO: Fallback para Hoje se o input estiver vazio
+    // Fallback para Hoje se o input estiver vazio
     if (AppState.selection.startDate) {
         start = new Date(AppState.selection.startDate + 'T00:00:00');
     } else {
@@ -352,7 +351,6 @@ function renderCalendar() {
         if (AppState.selection.absences.has(isoDate)) el.classList.add('selected-absence');
         if (AppState.selection.certificates.has(isoDate)) el.classList.add('selected-certificate');
         
-        // Marca o dia "Hoje" visualmente
         const todayIso = new Date().toISOString().split('T')[0];
         if (isoDate === todayIso) el.classList.add('today');
 
@@ -405,7 +403,6 @@ function updateReceiptPreview() {
     let start = AppState.selection.startDate;
     let end = AppState.selection.endDate;
 
-    // Proteção contra dados vazios
     if (!start || !end) {
         start = new Date().toISOString().split('T')[0];
         end = start;
@@ -427,7 +424,7 @@ function updateReceiptPreview() {
 
         const effectiveDaysForVT = totalBusinessDays - (prevMonthAbsences + prevMonthCerts);
         totalValue = effectiveDaysForVT * RECEIPT_CONFIG.dailyValue;
-        if(totalValue < 0) totalValue = 0; // Evita valor negativo
+        if(totalValue < 0) totalValue = 0; 
 
         descriptionText = "REFERENTE AO VALE TRANSPORTE";
         detailsHtml = `
@@ -468,7 +465,6 @@ function updateReceiptPreview() {
     if(DOM['receipt-description']) DOM['receipt-description'].textContent = descriptionText;
     if(DOM['receipt-period-info']) DOM['receipt-period-info'].innerHTML = detailsHtml; 
     
-    // Lista Feriados com Data
     if(DOM['receipt-holidays-info']) {
         DOM['receipt-holidays-info'].innerHTML = calculations.holidaysInPeriod.length > 0 
             ? `Feriados:<br>${calculations.holidaysInPeriod.map(h => `${formatDate(h.date)} - ${h.name}`).join('<br>')}` 
