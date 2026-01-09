@@ -2,55 +2,60 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebas
 import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 import { getFirestore, collection, query, onSnapshot, doc, setDoc, deleteDoc, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-// Importações dos nossos módulos
 import { formatCurrency, formatDate, getCurrentDateFormatted, capitalizeWords, numberToWords } from './utils.js';
 import { RECEIPT_CONFIG, HOLIDAYS_DB, calculateWorkingDays, getMarkedDatesInSpecificMonth } from './business.js';
 
 const AppState = {
-    user: {
-        id: null,
-        isAuthenticated: false
-    },
-    employees: [], 
+    user: { id: null, isAuthenticated: false },
+    employees: [],
     ui: {
         filterText: '',
         calendarMonth: new Date().getMonth(),
         calendarYear: new Date().getFullYear(),
-        currentMarkType: 'absence' 
+        currentMarkType: 'absence'
     },
     selection: {
-        employee: null, 
+        employee: null,
         receiptType: 'valeTransporte',
         startDate: '',
         endDate: '',
         internPeriod: 'matutino',
-        absences: new Set(), 
+        absences: new Set(),
         certificates: new Set()
     }
 };
 
 const DOM = {};
 
+// --- INICIALIZAÇÃO ROBUSTA ---
 async function init() {
     console.log("Iniciando Aplicação...");
     cacheDOM();
     setupEventListeners();
-    
-    // Configura datas iniciais e renderiza a UI IMEDIATAMENTE (Antes de conectar no banco)
+
+    // 1. Define datas padrão (Hoje)
     const today = new Date();
-    const firstDay = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
-    const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().split('T')[0];
+    const year = today.getFullYear();
+    const month = today.getMonth();
     
-    if(DOM.startDate) DOM.startDate.value = firstDay;
-    if(DOM.endDate) DOM.endDate.value = lastDay;
-    
-    handleInputChanges(); 
-    
-    // CORREÇÃO CRÍTICA: Força a renderização do calendário AGORA, sem esperar o Firebase
+    // Formata para YYYY-MM-DD
+    const firstDay = new Date(year, month, 1).toISOString().split('T')[0];
+    const lastDay = new Date(year, month + 1, 0).toISOString().split('T')[0];
+
+    // 2. Preenche os Inputs Visuais
+    if (DOM.startDate) DOM.startDate.value = firstDay;
+    if (DOM.endDate) DOM.endDate.value = lastDay;
+
+    // 3. Força a atualização do Estado (AppState) IMEDIATAMENTE
+    AppState.selection.startDate = firstDay;
+    AppState.selection.endDate = lastDay;
+    AppState.selection.receiptType = 'valeTransporte';
+
+    // 4. Renderiza o Calendário AGORA (Sem esperar nada)
     updateCalendarContext(); 
     updateReceiptPreview();
 
-    // Só então conecta ao banco
+    // 5. Só depois conecta ao banco
     await initFirebase();
 }
 
@@ -75,16 +80,18 @@ function cacheDOM() {
     ids.forEach(id => {
         const el = document.getElementById(id);
         if (el) DOM[id] = el;
+        // else console.warn(`Elemento não encontrado: ${id}`); // Comentado para limpar console
     });
 
     DOM.receiptTypeRadios = document.querySelectorAll('input[name="receiptType"]');
     DOM.markTypeRadios = document.querySelectorAll('input[name="markType"]');
 }
 
+// --- FIREBASE ---
 let db, auth;
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
-    apiKey: "AIzaSyAFbb0gWQ51vF92rN-Vis39FHqRAWbzhKE", 
+    apiKey: "AIzaSyAFbb0gWQ51vF92rN-Vis39FHqRAWbzhKE",
     authDomain: "funcionarias-503a4.firebaseapp.com",
     projectId: "funcionarias-503a4",
     storageBucket: "funcionarias-503a4.firebasestorage.app",
@@ -113,14 +120,13 @@ async function initFirebase() {
         });
     } catch (error) {
         console.error("Firebase Error:", error);
-        showModal("Erro Crítico", "Falha ao conectar ao banco de dados.");
+        showModal("Erro de Conexão", "Verifique sua internet.");
     }
 }
 
 function setupFirestoreListeners() {
     const employeesRef = collection(db, `artifacts/${appId}/public/data/employees`);
     const q = query(employeesRef);
-
     onSnapshot(q, (snapshot) => {
         AppState.employees = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         AppState.employees.sort((a, b) => a.nome.localeCompare(b.nome));
@@ -128,6 +134,7 @@ function setupFirestoreListeners() {
     });
 }
 
+// --- EVENTOS ---
 function setupEventListeners() {
     DOM.searchInput?.addEventListener('keyup', (e) => {
         AppState.ui.filterText = e.target.value;
@@ -149,7 +156,7 @@ function setupEventListeners() {
         radio.addEventListener('change', (e) => {
             AppState.selection.receiptType = e.target.value;
             toggleReceiptTypeFields();
-            updateCalendarContext(); 
+            updateCalendarContext();
             updateReceiptPreview();
         });
     });
@@ -157,6 +164,7 @@ function setupEventListeners() {
     DOM.prevMonth?.addEventListener('click', () => changeCalendarMonth(-1));
     DOM.nextMonth?.addEventListener('click', () => changeCalendarMonth(1));
     DOM.markTypeRadios.forEach(radio => radio.addEventListener('change', (e) => AppState.ui.currentMarkType = e.target.value));
+    
     DOM.clearMarkingButton?.addEventListener('click', () => {
         AppState.selection.absences.clear();
         AppState.selection.certificates.clear();
@@ -173,7 +181,7 @@ function setupEventListeners() {
 
     DOM.generateReceiptButton?.addEventListener('click', () => {
         if (!AppState.selection.employee) return showModal("Atenção", "Selecione uma funcionária.");
-        updateReceiptPreview(); 
+        updateReceiptPreview();
         DOM.modalEmployeeName.textContent = `Gerar recibo para ${capitalizeWords(AppState.selection.employee.nome)}?`;
         DOM.confirmationModal.classList.remove('hidden');
     });
@@ -182,7 +190,7 @@ function setupEventListeners() {
         DOM.confirmationModal.classList.add('hidden');
         DOM['welcome-message'].classList.add('hidden');
         DOM['receipt-content'].classList.remove('hidden');
-        window.print(); 
+        window.print();
     });
     DOM.cancelButton?.addEventListener('click', () => DOM.confirmationModal.classList.add('hidden'));
     DOM.cancelDeleteButton?.addEventListener('click', () => DOM.deleteConfirmationModal.classList.add('hidden'));
@@ -190,9 +198,13 @@ function setupEventListeners() {
 }
 
 function handleInputChanges() {
-    AppState.selection.startDate = DOM.startDate?.value;
-    AppState.selection.endDate = DOM.endDate?.value;
-    AppState.selection.receiptType = document.querySelector('input[name="receiptType"]:checked')?.value || 'valeTransporte';
+    // Garante que o estado esteja sincronizado com o DOM
+    if(DOM.startDate?.value) AppState.selection.startDate = DOM.startDate.value;
+    if(DOM.endDate?.value) AppState.selection.endDate = DOM.endDate.value;
+    
+    const checkedRadio = document.querySelector('input[name="receiptType"]:checked');
+    if(checkedRadio) AppState.selection.receiptType = checkedRadio.value;
+    
     toggleReceiptTypeFields();
 }
 
@@ -210,6 +222,7 @@ function toggleReceiptTypeFields() {
     }
 }
 
+// --- RENDERIZAÇÃO DE LISTA ---
 function renderEmployeeList() {
     if (!DOM.employeeList) return;
     DOM.employeeList.innerHTML = '';
@@ -234,9 +247,9 @@ function renderEmployeeList() {
         `;
 
         div.addEventListener('click', (e) => {
-            if (e.target.closest('.delete-btn')) return; 
+            if (e.target.closest('.delete-btn')) return;
             AppState.selection.employee = emp;
-            renderEmployeeList(); 
+            renderEmployeeList();
             showModal("Funcionária Selecionada", capitalizeWords(emp.nome));
             DOM['welcome-message'].classList.remove('hidden');
             DOM['receipt-content'].classList.add('hidden');
@@ -245,7 +258,7 @@ function renderEmployeeList() {
 
         div.querySelector('.delete-btn').addEventListener('click', (e) => {
             e.stopPropagation();
-            AppState.employeeToDelete = emp.id; 
+            AppState.employeeToDelete = emp.id;
             DOM.deleteEmployeeName.textContent = capitalizeWords(emp.nome);
             DOM.deleteConfirmationModal.classList.remove('hidden');
         });
@@ -254,11 +267,18 @@ function renderEmployeeList() {
     });
 }
 
+// --- CALENDÁRIO (LÓGICA CORRIGIDA) ---
 function updateCalendarContext() {
-    if (!AppState.selection.startDate) return;
-
-    const start = new Date(AppState.selection.startDate + 'T00:00:00');
+    let start;
     
+    // CORREÇÃO: Fallback para Hoje se o input estiver vazio
+    if (AppState.selection.startDate) {
+        start = new Date(AppState.selection.startDate + 'T00:00:00');
+    } else {
+        start = new Date(); // Data atual como segurança
+    }
+
+    // Regra: VT = mês anterior, Outros = mês selecionado
     if (AppState.selection.receiptType === 'valeTransporte') {
         AppState.ui.calendarMonth = start.getMonth() - 1;
         AppState.ui.calendarYear = start.getFullYear();
@@ -270,6 +290,7 @@ function updateCalendarContext() {
         AppState.ui.calendarMonth = start.getMonth();
         AppState.ui.calendarYear = start.getFullYear();
     }
+    
     renderCalendar();
 }
 
@@ -286,20 +307,24 @@ function changeCalendarMonth(delta) {
 }
 
 function renderCalendar() {
-    if (!DOM.calendar) return;
-    DOM.calendar.innerHTML = '';
+    if (!DOM.calendar) {
+        console.error("DOM Element #calendar não encontrado!");
+        return;
+    }
+    DOM.calendar.innerHTML = ''; // Limpa tudo
     
     const year = AppState.ui.calendarYear;
     const month = AppState.ui.calendarMonth;
     
     const monthNames = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
-    DOM.currentMonthYear.textContent = `${monthNames[month]} ${year}`;
+    if (DOM.currentMonthYear) DOM.currentMonthYear.textContent = `${monthNames[month]} ${year}`;
 
     const firstDayOfMonth = new Date(year, month, 1);
     const lastDayOfMonth = new Date(year, month + 1, 0);
     const daysInMonth = lastDayOfMonth.getDate();
     const startDayOfWeek = firstDayOfMonth.getDay();
 
+    // Dias da Semana
     ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"].forEach(d => {
         const el = document.createElement('div');
         el.className = 'calendar-day header';
@@ -307,20 +332,29 @@ function renderCalendar() {
         DOM.calendar.appendChild(el);
     });
 
+    // Padding (dias vazios)
     for (let i = 0; i < startDayOfWeek; i++) {
         const el = document.createElement('div');
         el.className = 'calendar-day other-month disabled-for-marking';
         DOM.calendar.appendChild(el);
     }
 
+    // Dias Reais
     for (let day = 1; day <= daysInMonth; day++) {
         const date = new Date(year, month, day);
         const isoDate = date.toISOString().split('T')[0];
         
+        const el = document.createElement('div');
+        el.className = 'calendar-day current-month';
+        el.textContent = day;
+        
         if (HOLIDAYS_DB.some(h => h.date === isoDate)) el.classList.add('holiday');
         if (AppState.selection.absences.has(isoDate)) el.classList.add('selected-absence');
         if (AppState.selection.certificates.has(isoDate)) el.classList.add('selected-certificate');
-        if (isoDate === new Date().toISOString().split('T')[0]) el.classList.add('today');
+        
+        // Marca o dia "Hoje" visualmente
+        const todayIso = new Date().toISOString().split('T')[0];
+        if (isoDate === todayIso) el.classList.add('today');
 
         el.addEventListener('click', () => toggleDateSelection(isoDate, el));
         DOM.calendar.appendChild(el);
@@ -338,7 +372,7 @@ function toggleDateSelection(isoDate, el) {
             el.classList.remove('selected-absence');
         } else {
             abs.add(isoDate);
-            cert.delete(isoDate); 
+            cert.delete(isoDate);
             el.classList.add('selected-absence');
             el.classList.remove('selected-certificate');
         }
@@ -348,7 +382,7 @@ function toggleDateSelection(isoDate, el) {
             el.classList.remove('selected-certificate');
         } else {
             cert.add(isoDate);
-            abs.delete(isoDate); 
+            abs.delete(isoDate);
             el.classList.add('selected-certificate');
             el.classList.remove('selected-absence');
         }
@@ -356,21 +390,26 @@ function toggleDateSelection(isoDate, el) {
     updateReceiptPreview();
 }
 
+// --- RECIBO ---
 function updateReceiptPreview() {
     if (!AppState.selection.employee) return;
     
-    DOM['receipt-date-top'].textContent = getCurrentDateFormatted();
-    DOM['employee-name'].textContent = capitalizeWords(AppState.selection.employee.nome);
-    DOM['employee-cpf'].textContent = AppState.selection.employee.cpf;
-    DOM['employee-signature-name'].textContent = capitalizeWords(AppState.selection.employee.nome);
-    DOM['receipt-payer'].textContent = RECEIPT_CONFIG.payer;
-    DOM['receipt-cnpj'].textContent = `CNPJ: ${RECEIPT_CONFIG.cnpj}`;
+    if(DOM['receipt-date-top']) DOM['receipt-date-top'].textContent = getCurrentDateFormatted();
+    if(DOM['employee-name']) DOM['employee-name'].textContent = capitalizeWords(AppState.selection.employee.nome);
+    if(DOM['employee-cpf']) DOM['employee-cpf'].textContent = AppState.selection.employee.cpf;
+    if(DOM['employee-signature-name']) DOM['employee-signature-name'].textContent = capitalizeWords(AppState.selection.employee.nome);
+    if(DOM['receipt-payer']) DOM['receipt-payer'].textContent = RECEIPT_CONFIG.payer;
+    if(DOM['receipt-cnpj']) DOM['receipt-cnpj'].textContent = `CNPJ: ${RECEIPT_CONFIG.cnpj}`;
 
     const type = AppState.selection.receiptType;
-    const start = AppState.selection.startDate;
-    const end = AppState.selection.endDate;
+    let start = AppState.selection.startDate;
+    let end = AppState.selection.endDate;
 
-    if (!start || !end) return;
+    // Proteção contra dados vazios
+    if (!start || !end) {
+        start = new Date().toISOString().split('T')[0];
+        end = start;
+    }
 
     const calculations = calculateWorkingDays(start, end, AppState.selection.absences, AppState.selection.certificates);
     
@@ -388,6 +427,7 @@ function updateReceiptPreview() {
 
         const effectiveDaysForVT = totalBusinessDays - (prevMonthAbsences + prevMonthCerts);
         totalValue = effectiveDaysForVT * RECEIPT_CONFIG.dailyValue;
+        if(totalValue < 0) totalValue = 0; // Evita valor negativo
 
         descriptionText = "REFERENTE AO VALE TRANSPORTE";
         detailsHtml = `
@@ -403,6 +443,7 @@ function updateReceiptPreview() {
         const dailyAllowance = RECEIPT_CONFIG.monthlyAllowance / 30;
         const discount = calculations.absenceCount * dailyAllowance;
         totalValue = RECEIPT_CONFIG.monthlyAllowance - discount;
+        if(totalValue < 0) totalValue = 0;
 
         detailsHtml = `
             <strong>Valor Mensal:</strong> ${formatCurrency(RECEIPT_CONFIG.monthlyAllowance)}<br>
@@ -422,17 +463,20 @@ function updateReceiptPreview() {
         }
     }
 
-    DOM['receipt-total'].textContent = formatCurrency(totalValue);
-    DOM['receipt-total-words'].textContent = numberToWords(totalValue);
-    DOM['receipt-description'].textContent = descriptionText;
-    DOM['receipt-period-info'].innerHTML = detailsHtml; 
+    if(DOM['receipt-total']) DOM['receipt-total'].textContent = formatCurrency(totalValue);
+    if(DOM['receipt-total-words']) DOM['receipt-total-words'].textContent = numberToWords(totalValue);
+    if(DOM['receipt-description']) DOM['receipt-description'].textContent = descriptionText;
+    if(DOM['receipt-period-info']) DOM['receipt-period-info'].innerHTML = detailsHtml; 
     
-    // CORREÇÃO: Data + Nome do feriado e formatação com <br>
-    DOM['receipt-holidays-info'].innerHTML = calculations.holidaysInPeriod.length > 0 
-        ? `Feriados:<br>${calculations.holidaysInPeriod.map(h => `${formatDate(h.date)} - ${h.name}`).join('<br>')}` 
-        : '';
+    // Lista Feriados com Data
+    if(DOM['receipt-holidays-info']) {
+        DOM['receipt-holidays-info'].innerHTML = calculations.holidaysInPeriod.length > 0 
+            ? `Feriados:<br>${calculations.holidaysInPeriod.map(h => `${formatDate(h.date)} - ${h.name}`).join('<br>')}` 
+            : '';
+    }
 }
 
+// --- MODAIS E CRUD ---
 async function handleAddEmployee() {
     const nome = DOM.newEmployeeName.value.trim();
     const cpf = DOM.newEmployeeCpf.value.trim();
@@ -450,7 +494,7 @@ async function handleAddEmployee() {
         DOM.newEmployeeCpf.value = '';
     } catch (e) {
         console.error(e);
-        showModal("Erro", "Falha ao salvar no banco de dados.");
+        showModal("Erro", "Falha ao salvar.");
     }
 }
 
