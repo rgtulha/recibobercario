@@ -79,26 +79,55 @@
             font-weight: 600;
             border-color: #10b981;
         }
-        /* Configuração de Impressão */
+        
+        /* --- CONFIGURAÇÃO DE IMPRESSÃO (CORRIGIDA) --- */
         @media print {
-            /* Remove cabeçalhos automáticos (URL, Data) */
             @page {
-                margin: 0;
+                /* Remove cabeçalhos/rodapés automáticos do navegador (URL, Data, Título) */
+                margin: 0; 
+                size: auto;
             }
+            
             body {
-                margin: 1.6cm; /* Margem segura para o papel */
+                /* Define margens manuais para o papel A4 */
+                /* Topo: 1.5cm | Direita: 1.5cm | Fundo: 3.0cm (Aumentado) | Esquerda: 1.5cm */
+                margin: 1.5cm 1.5cm 3cm 1.5cm; 
+                
+                /* Garante que cores de fundo (como nos feriados) apareçam */
+                -webkit-print-color-adjust: exact; 
+                print-color-adjust: exact;
             }
 
             .no-print { display: none !important; }
-            main { display: block; padding: 0; margin: 0; }
+            
+            main { display: block; padding: 0; margin: 0; width: 100%; }
             aside { display: none !important; }
+            
             #receipt-section {
-                margin: 0; padding: 0; border: none; box-shadow: none;
-                width: 100%; max-width: 100%; background-color: transparent !important;
+                margin: 0; 
+                padding: 0; 
+                border: none; 
+                box-shadow: none;
+                width: 100%; 
+                max-width: 100%; 
+                background-color: transparent !important;
             }
-            #receipt-content { display: block !important; }
+            
+            #receipt-content { display: block !important; width: 100%; }
+            
             #welcome-message, .modal { display: none !important; }
-            #receipt-content > div { box-shadow: none !important; border: none !important; padding: 0 !important; }
+            
+            #receipt-content > div { 
+                box-shadow: none !important; 
+                border: none !important; 
+                padding: 0 !important; 
+            }
+            
+            /* Ajuste para o rodapé não ficar colado */
+            .copyright-footer {
+                margin-top: 2cm !important;
+                padding-bottom: 0 !important;
+            }
         }
     </style>
 </head>
@@ -284,7 +313,7 @@
                         <p class="text-sm text-stone-500">Assinatura do(a) Colaborador(a)</p>
                     </div>
 
-                    <div class="mt-8 text-center text-xs text-stone-400">
+                    <div class="mt-8 text-center text-xs text-stone-400 copyright-footer">
                         &copy; 2025 - Berçário Escola Crescer Kids
                     </div>
                 </div>
