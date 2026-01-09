@@ -197,7 +197,6 @@ function setupEventListeners() {
 }
 
 function handleInputChanges() {
-    // Garante que o estado esteja sincronizado com o DOM
     if(DOM.startDate?.value) AppState.selection.startDate = DOM.startDate.value;
     if(DOM.endDate?.value) AppState.selection.endDate = DOM.endDate.value;
     
@@ -410,6 +409,10 @@ function updateReceiptPreview() {
 
     const calculations = calculateWorkingDays(start, end, AppState.selection.absences, AppState.selection.certificates);
     
+    // --- NOVO: Linha de Período ---
+    // Cria a string do período: "Período: DD/MM/AAAA até DD/MM/AAAA"
+    const periodString = `<strong>Período:</strong> ${formatDate(start)} até ${formatDate(end)}<br>`;
+
     let totalValue = 0;
     let descriptionText = '';
     let detailsHtml = '';
@@ -427,7 +430,10 @@ function updateReceiptPreview() {
         if(totalValue < 0) totalValue = 0; 
 
         descriptionText = "REFERENTE AO VALE TRANSPORTE";
+        
+        // Inserimos o periodString no início
         detailsHtml = `
+            ${periodString}
             <strong>Valor Diário:</strong> ${formatCurrency(RECEIPT_CONFIG.dailyValue)}<br>
             <strong>Dias Úteis no Período:</strong> ${totalBusinessDays}<br>
             <span class="text-red-600">Descontos (Mês Anterior): ${prevMonthAbsences + prevMonthCerts} dias</span>
@@ -442,7 +448,9 @@ function updateReceiptPreview() {
         totalValue = RECEIPT_CONFIG.monthlyAllowance - discount;
         if(totalValue < 0) totalValue = 0;
 
+        // Inserimos o periodString no início
         detailsHtml = `
+            ${periodString}
             <strong>Valor Mensal:</strong> ${formatCurrency(RECEIPT_CONFIG.monthlyAllowance)}<br>
             <span class="text-red-600">Faltas descontadas: ${calculations.absenceCount} dias</span>
         `;
@@ -453,10 +461,12 @@ function updateReceiptPreview() {
         
         if (calculations.absenceCount > 0 || calculations.certificateCount > 0) {
             totalValue = 0;
-            detailsHtml = `<span class="text-red-600 font-bold">Bonificação cancelada devido a faltas/atestados.</span>`;
+            // Inserimos o periodString mesmo em caso de cancelamento
+            detailsHtml = `${periodString}<span class="text-red-600 font-bold">Bonificação cancelada devido a faltas/atestados.</span>`;
         } else {
             totalValue = RECEIPT_CONFIG.fixedBonusAmount;
-            detailsHtml = `<strong>Valor Integral:</strong> ${formatCurrency(totalValue)}`;
+            // Inserimos o periodString no início
+            detailsHtml = `${periodString}<strong>Valor Integral:</strong> ${formatCurrency(totalValue)}`;
         }
     }
 
