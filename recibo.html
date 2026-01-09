@@ -80,53 +80,73 @@
             border-color: #10b981;
         }
         
-        /* --- CONFIGURAÇÃO DE IMPRESSÃO (CORRIGIDA) --- */
+        /* --- CONFIGURAÇÃO DE IMPRESSÃO (AJUSTE FINO DE MARGENS) --- */
         @media print {
             @page {
-                /* Remove cabeçalhos/rodapés automáticos do navegador (URL, Data, Título) */
+                /* Remove cabeçalhos/rodapés automáticos do navegador */
                 margin: 0; 
-                size: auto;
+                size: auto; 
             }
             
+            html, body {
+                width: 100%;
+                height: auto;
+                background: #fff;
+            }
+
             body {
-                /* Define margens manuais para o papel A4 */
-                /* Topo: 1.5cm | Direita: 1.5cm | Fundo: 3.0cm (Aumentado) | Esquerda: 1.5cm */
-                margin: 1.5cm 1.5cm 3cm 1.5cm; 
+                /* TÉCNICA DE PADDING: */
+                /* Usamos padding em vez de margin para "empurrar" o conteúdo para dentro */
+                /* Topo: 1.5cm | Dir: 1.5cm | Fundo: 5cm (Bem grande para subir o texto) | Esq: 1.5cm */
+                padding: 1.5cm 1.5cm 5cm 1.5cm !important;
+                margin: 0 !important;
                 
-                /* Garante que cores de fundo (como nos feriados) apareçam */
                 -webkit-print-color-adjust: exact; 
                 print-color-adjust: exact;
             }
 
             .no-print { display: none !important; }
             
-            main { display: block; padding: 0; margin: 0; width: 100%; }
+            /* Removemos o comportamento de "tela cheia" do layout original */
+            main { 
+                display: block !important; 
+                padding: 0 !important; 
+                margin: 0 !important; 
+                width: 100% !important;
+                min-height: 0 !important; /* Evita que o navegador tente esticar a página */
+            }
+            
             aside { display: none !important; }
             
             #receipt-section {
-                margin: 0; 
-                padding: 0; 
-                border: none; 
-                box-shadow: none;
-                width: 100%; 
-                max-width: 100%; 
+                margin: 0 !important; 
+                padding: 0 !important; 
+                border: none !important; 
+                box-shadow: none !important;
+                width: 100% !important; 
+                max-width: 100% !important; 
                 background-color: transparent !important;
+                /* Garante que o container não tenha altura fixa */
+                height: auto !important; 
             }
             
-            #receipt-content { display: block !important; width: 100%; }
+            #receipt-content { 
+                display: block !important; 
+                width: 100% !important;
+            }
             
             #welcome-message, .modal { display: none !important; }
             
             #receipt-content > div { 
                 box-shadow: none !important; 
                 border: none !important; 
-                padding: 0 !important; 
+                padding: 0 !important; /* Remove padding interno do card para usar o do body */
             }
             
-            /* Ajuste para o rodapé não ficar colado */
+            /* Garante espaço extra especificamente acima do rodapé */
             .copyright-footer {
-                margin-top: 2cm !important;
-                padding-bottom: 0 !important;
+                margin-top: 3cm !important; 
+                font-size: 10px !important;
             }
         }
     </style>
