@@ -1,6 +1,7 @@
 /**
  * js/business.js
  * Regras de negócio, constantes de configuração e cálculos de datas.
+ * Atualizado com feriados de Goiânia e Corpus Christi até 2030.
  */
 
 // Configuração fixa do Emissor e Valores
@@ -10,66 +11,138 @@ export const RECEIPT_CONFIG = {
     description: "REFERENTE AO VALE TRANSPORTE",
     location: "Goiânia",
     // Valores monetários base
-    dailyValue: 8.60,         // Valor diário do vale transporte
-    fixedBonusAmount: 200.00, // Valor fixo da bonificação
-    monthlyAllowance: 1100.00 // Valor fixo mensal da bolsa de estágio
+    dailyValue: 8.60,         
+    fixedBonusAmount: 200.00, 
+    monthlyAllowance: 1100.00 
 };
 
-// Lista de Feriados de 2025
-export const HOLIDAYS_2025 = [ 
+/**
+ * Lista de Feriados (2025 a 2030)
+ * Inclui Feriados Nacionais, Municipais de Goiânia e Móveis (Carnaval, Sexta-feira Santa, Corpus Christi).
+ */
+export const HOLIDAYS_DB = [
+    // --- 2025 ---
     {date: "2025-01-01", name: "Confraternização Universal"},
-    {date: "2025-03-03", name: "Carnaval (Ponto Facultativo)"},
-    {date: "2025-03-04", name: "Carnaval (Ponto Facultativo)"},
-    {date: "2025-04-18", name: "Paixão de Cristo"},
+    {date: "2025-03-03", name: "Carnaval"},
+    {date: "2025-03-04", name: "Carnaval"},
+    {date: "2025-04-18", name: "Sexta-feira Santa"},
     {date: "2025-04-21", name: "Tiradentes"},
-    {date: "2025-05-01", name: "Dia do Trabalho"},
-    {date: "2025-06-19", name: "Corpus Christi (Ponto Facultativo)"},
+    {date: "2025-05-01", name: "Dia do Trabalhador"},
+    {date: "2025-05-24", name: "Nossa Senhora Auxiliadora (Padroeira de Goiânia)"},
+    {date: "2025-06-19", name: "Corpus Christi"},
     {date: "2025-09-07", name: "Independência do Brasil"},
     {date: "2025-10-12", name: "Nossa Senhora Aparecida"},
-    {date: "2025-10-24", name: "Aniversário de Goiânia"}, 
+    {date: "2025-10-24", name: "Aniversário de Goiânia"},
     {date: "2025-11-02", name: "Finados"},
     {date: "2025-11-15", name: "Proclamação da República"},
-    {date: "2025-11-20", name: "Consciência Negra"},
-    {date: "2025-12-25", name: "Natal"}
+    {date: "2025-11-20", name: "Dia da Consciência Negra"},
+    {date: "2025-12-25", name: "Natal"},
+
+    // --- 2026 ---
+    {date: "2026-01-01", name: "Confraternização Universal"},
+    {date: "2026-02-17", name: "Carnaval"}, 
+    {date: "2026-04-03", name: "Sexta-feira Santa"},
+    {date: "2026-04-21", name: "Tiradentes"},
+    {date: "2026-05-01", name: "Dia do Trabalhador"},
+    {date: "2026-05-24", name: "Nossa Senhora Auxiliadora"},
+    {date: "2026-06-04", name: "Corpus Christi"}, // Adicionado
+    {date: "2026-09-07", name: "Independência do Brasil"},
+    {date: "2026-10-12", name: "Nossa Senhora Aparecida"},
+    {date: "2026-10-24", name: "Aniversário de Goiânia"},
+    {date: "2026-11-02", name: "Finados"},
+    {date: "2026-11-15", name: "Proclamação da República"},
+    {date: "2026-11-20", name: "Dia da Consciência Negra"},
+    {date: "2026-12-25", name: "Natal"},
+
+    // --- 2027 ---
+    {date: "2027-01-01", name: "Confraternização Universal"},
+    {date: "2027-02-09", name: "Carnaval"}, 
+    {date: "2027-03-26", name: "Sexta-feira Santa"}, 
+    {date: "2027-04-21", name: "Tiradentes"},
+    {date: "2027-05-01", name: "Dia do Trabalhador"},
+    {date: "2027-05-24", name: "Nossa Senhora Auxiliadora"},
+    {date: "2027-05-27", name: "Corpus Christi"}, // Adicionado
+    {date: "2027-09-07", name: "Independência do Brasil"},
+    {date: "2027-10-12", name: "Nossa Senhora Aparecida"},
+    {date: "2027-10-24", name: "Aniversário de Goiânia"},
+    {date: "2027-11-02", name: "Finados"},
+    {date: "2027-11-15", name: "Proclamação da República"},
+    {date: "2027-11-20", name: "Dia da Consciência Negra"},
+    {date: "2027-12-25", name: "Natal"},
+
+    // --- 2028 (Bissexto) ---
+    {date: "2028-01-01", name: "Confraternização Universal"},
+    {date: "2028-02-29", name: "Carnaval"}, 
+    {date: "2028-04-14", name: "Sexta-feira Santa"}, 
+    {date: "2028-04-21", name: "Tiradentes"},
+    {date: "2028-05-01", name: "Dia do Trabalhador"},
+    {date: "2028-05-24", name: "Nossa Senhora Auxiliadora"},
+    {date: "2028-06-15", name: "Corpus Christi"}, // Adicionado
+    {date: "2028-09-07", name: "Independência do Brasil"},
+    {date: "2028-10-12", name: "Nossa Senhora Aparecida"},
+    {date: "2028-10-24", name: "Aniversário de Goiânia"},
+    {date: "2028-11-02", name: "Finados"},
+    {date: "2028-11-15", name: "Proclamação da República"},
+    {date: "2028-11-20", name: "Dia da Consciência Negra"},
+    {date: "2028-12-25", name: "Natal"},
+
+    // --- 2029 ---
+    {date: "2029-01-01", name: "Confraternização Universal"},
+    {date: "2029-02-13", name: "Carnaval"}, 
+    {date: "2029-03-30", name: "Sexta-feira Santa"}, 
+    {date: "2029-04-21", name: "Tiradentes"},
+    {date: "2029-05-01", name: "Dia do Trabalhador"},
+    {date: "2029-05-24", name: "Nossa Senhora Auxiliadora"},
+    {date: "2029-05-31", name: "Corpus Christi"}, // Adicionado
+    {date: "2029-09-07", name: "Independência do Brasil"},
+    {date: "2029-10-12", name: "Nossa Senhora Aparecida"},
+    {date: "2029-10-24", name: "Aniversário de Goiânia"},
+    {date: "2029-11-02", name: "Finados"},
+    {date: "2029-11-15", name: "Proclamação da República"},
+    {date: "2029-11-20", name: "Dia da Consciência Negra"},
+    {date: "2029-12-25", name: "Natal"},
+
+    // --- 2030 ---
+    {date: "2030-01-01", name: "Confraternização Universal"},
+    {date: "2030-03-05", name: "Carnaval"}, 
+    {date: "2030-04-19", name: "Sexta-feira Santa"}, 
+    {date: "2030-04-21", name: "Tiradentes"}, 
+    {date: "2030-05-01", name: "Dia do Trabalhador"},
+    {date: "2030-05-24", name: "Nossa Senhora Auxiliadora"},
+    {date: "2030-06-20", name: "Corpus Christi"}, // Adicionado
+    {date: "2030-09-07", name: "Independência do Brasil"},
+    {date: "2030-10-12", name: "Nossa Senhora Aparecida"},
+    {date: "2030-10-24", name: "Aniversário de Goiânia"},
+    {date: "2030-11-02", name: "Finados"},
+    {date: "2030-11-15", name: "Proclamação da República"},
+    {date: "2030-11-20", name: "Dia da Consciência Negra"},
+    {date: "2030-12-25", name: "Natal"}
 ];
 
-/**
- * Calcula os dias úteis efetivos dentro de um período, descontando feriados e finais de semana.
- * Também contabiliza as faltas e atestados que caem em dias úteis.
- * * @param {Date|string} startDate - Data de início.
- * @param {Date|string} endDate - Data de fim.
- * @param {Set<string>} absencesSet - Set contendo strings (YYYY-MM-DD) de dias de falta.
- * @param {Set<string>} certificatesSet - Set contendo strings (YYYY-MM-DD) de dias de atestado.
- * @returns {Object} { effectiveDays, absenceCount, certificateCount, holidaysFound }
- */
 export function calculateWorkingDays(startDate, endDate, absencesSet, certificatesSet) {
     let effectiveDays = 0;
     let absenceCount = 0;
     let certificateCount = 0;
     let holidaysFound = [];
 
-    // Normaliza para objetos Date para garantir a iteração correta
     const start = new Date(startDate);
     const end = new Date(endDate);
-    
-    // Iterador começa no dia de início
     const currentDate = new Date(start);
 
-    // Loop dia a dia
     while (currentDate <= end) {
         const dayOfWeek = currentDate.getDay();
-        const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6); // 0 = Dom, 6 = Sáb
+        const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6); 
         
         const isoDateString = currentDate.toISOString().split('T')[0];
-        const holiday = HOLIDAYS_2025.find(h => h.date === isoDateString);
+        
+        // Agora busca em HOLIDAYS_DB
+        const holiday = HOLIDAYS_DB.find(h => h.date === isoDateString);
         const isHoliday = holiday !== undefined;
 
-        // Verifica marcações nos Sets
         const isAbsenceDay = absencesSet.has(isoDateString);
         const isCertificateDay = certificatesSet.has(isoDateString);
 
         if (!isWeekend && !isHoliday) {
-            // É um dia útil potencial
             if (!isAbsenceDay && !isCertificateDay) {
                 effectiveDays++;
             } else {
@@ -80,7 +153,6 @@ export function calculateWorkingDays(startDate, endDate, absencesSet, certificat
             holidaysFound.push(holiday);
         }
 
-        // Avança para o próximo dia
         currentDate.setDate(currentDate.getDate() + 1);
     }
 
@@ -92,20 +164,11 @@ export function calculateWorkingDays(startDate, endDate, absencesSet, certificat
     };
 }
 
-/**
- * Filtra um conjunto global de datas marcadas para encontrar apenas aquelas que pertencem
- * a um mês e ano específicos. Útil para lógica de Vale Transporte (mês anterior).
- * * @param {Set<string>} globalMarkedDatesSet - Set com todas as datas marcadas.
- * @param {number} year - Ano (ex: 2025).
- * @param {number} monthIndex - Índice do mês (0 = Janeiro, 11 = Dezembro).
- * @returns {Set<string>} Novo Set contendo apenas as datas do mês solicitado.
- */
 export function getMarkedDatesInSpecificMonth(globalMarkedDatesSet, year, monthIndex) {
     const startOfMonth = new Date(year, monthIndex, 1);
     const endOfMonth = new Date(year, monthIndex + 1, 0);
     
     const filteredDates = Array.from(globalMarkedDatesSet).filter(dateString => {
-        // Adiciona T00:00:00 para evitar problemas de timezone ao converter string para Date
         const date = new Date(dateString + 'T00:00:00'); 
         return date >= startOfMonth && date <= endOfMonth;
     });
