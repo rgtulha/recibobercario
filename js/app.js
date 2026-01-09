@@ -35,9 +35,8 @@ async function init() {
     console.log("Iniciando Aplicação...");
     cacheDOM();
     setupEventListeners();
-    await initFirebase();
     
-    // Configura datas iniciais (Mês atual completo)
+    // Configura datas iniciais e renderiza a UI IMEDIATAMENTE (Antes de conectar no banco)
     const today = new Date();
     const firstDay = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
     const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().split('T')[0];
@@ -47,9 +46,12 @@ async function init() {
     
     handleInputChanges(); 
     
-    // Força a renderização inicial
+    // CORREÇÃO CRÍTICA: Força a renderização do calendário AGORA, sem esperar o Firebase
     updateCalendarContext(); 
     updateReceiptPreview();
+
+    // Só então conecta ao banco
+    await initFirebase();
 }
 
 function cacheDOM() {
@@ -425,7 +427,7 @@ function updateReceiptPreview() {
     DOM['receipt-description'].textContent = descriptionText;
     DOM['receipt-period-info'].innerHTML = detailsHtml; 
     
-    // CORREÇÃO: Adicionada formatação de Data + Nome e uso de <br>
+    // CORREÇÃO: Data + Nome do feriado e formatação com <br>
     DOM['receipt-holidays-info'].innerHTML = calculations.holidaysInPeriod.length > 0 
         ? `Feriados:<br>${calculations.holidaysInPeriod.map(h => `${formatDate(h.date)} - ${h.name}`).join('<br>')}` 
         : '';
