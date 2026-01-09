@@ -1,7 +1,6 @@
 /**
  * js/business.js
  * Regras de negócio, constantes de configuração e cálculos de datas.
- * Atualizado com feriados de Goiânia e Corpus Christi até 2030.
  */
 
 // Configuração fixa do Emissor e Valores
@@ -10,15 +9,13 @@ export const RECEIPT_CONFIG = {
     cnpj: "32.741.557/0001-70",
     description: "REFERENTE AO VALE TRANSPORTE",
     location: "Goiânia",
-    // Valores monetários base
     dailyValue: 8.60,         
     fixedBonusAmount: 200.00, 
     monthlyAllowance: 1100.00 
 };
 
 /**
- * Lista de Feriados (2025 a 2030)
- * Inclui Feriados Nacionais, Municipais de Goiânia e Móveis (Carnaval, Sexta-feira Santa, Corpus Christi).
+ * Lista Completa de Feriados (2025-2030)
  */
 export const HOLIDAYS_DB = [
     // --- 2025 ---
@@ -45,7 +42,7 @@ export const HOLIDAYS_DB = [
     {date: "2026-04-21", name: "Tiradentes"},
     {date: "2026-05-01", name: "Dia do Trabalhador"},
     {date: "2026-05-24", name: "Nossa Senhora Auxiliadora"},
-    {date: "2026-06-04", name: "Corpus Christi"}, // Adicionado
+    {date: "2026-06-04", name: "Corpus Christi"},
     {date: "2026-09-07", name: "Independência do Brasil"},
     {date: "2026-10-12", name: "Nossa Senhora Aparecida"},
     {date: "2026-10-24", name: "Aniversário de Goiânia"},
@@ -61,7 +58,7 @@ export const HOLIDAYS_DB = [
     {date: "2027-04-21", name: "Tiradentes"},
     {date: "2027-05-01", name: "Dia do Trabalhador"},
     {date: "2027-05-24", name: "Nossa Senhora Auxiliadora"},
-    {date: "2027-05-27", name: "Corpus Christi"}, // Adicionado
+    {date: "2027-05-27", name: "Corpus Christi"},
     {date: "2027-09-07", name: "Independência do Brasil"},
     {date: "2027-10-12", name: "Nossa Senhora Aparecida"},
     {date: "2027-10-24", name: "Aniversário de Goiânia"},
@@ -70,14 +67,14 @@ export const HOLIDAYS_DB = [
     {date: "2027-11-20", name: "Dia da Consciência Negra"},
     {date: "2027-12-25", name: "Natal"},
 
-    // --- 2028 (Bissexto) ---
+    // --- 2028 ---
     {date: "2028-01-01", name: "Confraternização Universal"},
     {date: "2028-02-29", name: "Carnaval"}, 
     {date: "2028-04-14", name: "Sexta-feira Santa"}, 
     {date: "2028-04-21", name: "Tiradentes"},
     {date: "2028-05-01", name: "Dia do Trabalhador"},
     {date: "2028-05-24", name: "Nossa Senhora Auxiliadora"},
-    {date: "2028-06-15", name: "Corpus Christi"}, // Adicionado
+    {date: "2028-06-15", name: "Corpus Christi"},
     {date: "2028-09-07", name: "Independência do Brasil"},
     {date: "2028-10-12", name: "Nossa Senhora Aparecida"},
     {date: "2028-10-24", name: "Aniversário de Goiânia"},
@@ -93,7 +90,7 @@ export const HOLIDAYS_DB = [
     {date: "2029-04-21", name: "Tiradentes"},
     {date: "2029-05-01", name: "Dia do Trabalhador"},
     {date: "2029-05-24", name: "Nossa Senhora Auxiliadora"},
-    {date: "2029-05-31", name: "Corpus Christi"}, // Adicionado
+    {date: "2029-05-31", name: "Corpus Christi"},
     {date: "2029-09-07", name: "Independência do Brasil"},
     {date: "2029-10-12", name: "Nossa Senhora Aparecida"},
     {date: "2029-10-24", name: "Aniversário de Goiânia"},
@@ -109,7 +106,7 @@ export const HOLIDAYS_DB = [
     {date: "2030-04-21", name: "Tiradentes"}, 
     {date: "2030-05-01", name: "Dia do Trabalhador"},
     {date: "2030-05-24", name: "Nossa Senhora Auxiliadora"},
-    {date: "2030-06-20", name: "Corpus Christi"}, // Adicionado
+    {date: "2030-06-20", name: "Corpus Christi"},
     {date: "2030-09-07", name: "Independência do Brasil"},
     {date: "2030-10-12", name: "Nossa Senhora Aparecida"},
     {date: "2030-10-24", name: "Aniversário de Goiânia"},
@@ -134,8 +131,6 @@ export function calculateWorkingDays(startDate, endDate, absencesSet, certificat
         const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6); 
         
         const isoDateString = currentDate.toISOString().split('T')[0];
-        
-        // Agora busca em HOLIDAYS_DB
         const holiday = HOLIDAYS_DB.find(h => h.date === isoDateString);
         const isHoliday = holiday !== undefined;
 
