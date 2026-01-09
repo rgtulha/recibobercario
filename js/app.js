@@ -45,10 +45,9 @@ async function init() {
     if(DOM.startDate) DOM.startDate.value = firstDay;
     if(DOM.endDate) DOM.endDate.value = lastDay;
     
-    // Atualiza o estado com os valores dos inputs
     handleInputChanges(); 
     
-    // CORREÇÃO: Força a renderização inicial do calendário e do recibo
+    // Força a renderização inicial
     updateCalendarContext(); 
     updateReceiptPreview();
 }
@@ -138,7 +137,7 @@ function setupEventListeners() {
         AppState.selection.endDate = DOM.endDate.value;
         AppState.selection.absences.clear();
         AppState.selection.certificates.clear();
-        updateCalendarContext(); // Isso chama o renderCalendar
+        updateCalendarContext(); 
         updateReceiptPreview();
     };
     DOM.startDate?.addEventListener('change', updateDates);
@@ -258,9 +257,6 @@ function updateCalendarContext() {
 
     const start = new Date(AppState.selection.startDate + 'T00:00:00');
     
-    // Regra de visualização do calendário:
-    // VT = mostra o mês anterior
-    // Outros = mostra o mês atual/selecionado
     if (AppState.selection.receiptType === 'valeTransporte') {
         AppState.ui.calendarMonth = start.getMonth() - 1;
         AppState.ui.calendarYear = start.getFullYear();
@@ -318,10 +314,6 @@ function renderCalendar() {
     for (let day = 1; day <= daysInMonth; day++) {
         const date = new Date(year, month, day);
         const isoDate = date.toISOString().split('T')[0];
-        
-        const el = document.createElement('div');
-        el.className = 'calendar-day current-month';
-        el.textContent = day;
         
         if (HOLIDAYS_DB.some(h => h.date === isoDate)) el.classList.add('holiday');
         if (AppState.selection.absences.has(isoDate)) el.classList.add('selected-absence');
@@ -432,8 +424,10 @@ function updateReceiptPreview() {
     DOM['receipt-total-words'].textContent = numberToWords(totalValue);
     DOM['receipt-description'].textContent = descriptionText;
     DOM['receipt-period-info'].innerHTML = detailsHtml; 
+    
+    // CORREÇÃO: Adicionada formatação de Data + Nome e uso de <br>
     DOM['receipt-holidays-info'].innerHTML = calculations.holidaysInPeriod.length > 0 
-        ? `Feriados: ${calculations.holidaysInPeriod.map(h => h.name).join(', ')}` 
+        ? `Feriados:<br>${calculations.holidaysInPeriod.map(h => `${formatDate(h.date)} - ${h.name}`).join('<br>')}` 
         : '';
 }
 
