@@ -4,7 +4,6 @@ import { getFirestore, collection, query, onSnapshot, doc, setDoc, deleteDoc, ge
 
 // Importações dos nossos módulos
 import { formatCurrency, formatDate, getCurrentDateFormatted, capitalizeWords, numberToWords } from './utils.js';
-// MUDANÇA AQUI: HOLIDAYS_DB no lugar de HOLIDAYS_2025
 import { RECEIPT_CONFIG, HOLIDAYS_DB, calculateWorkingDays, getMarkedDatesInSpecificMonth } from './business.js';
 
 const AppState = {
@@ -38,6 +37,7 @@ async function init() {
     setupEventListeners();
     await initFirebase();
     
+    // Configura datas iniciais (Mês atual completo)
     const today = new Date();
     const firstDay = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
     const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().split('T')[0];
@@ -45,7 +45,12 @@ async function init() {
     if(DOM.startDate) DOM.startDate.value = firstDay;
     if(DOM.endDate) DOM.endDate.value = lastDay;
     
+    // Atualiza o estado com os valores dos inputs
     handleInputChanges(); 
+    
+    // CORREÇÃO: Força a renderização inicial do calendário e do recibo
+    updateCalendarContext(); 
+    updateReceiptPreview();
 }
 
 function cacheDOM() {
@@ -133,8 +138,7 @@ function setupEventListeners() {
         AppState.selection.endDate = DOM.endDate.value;
         AppState.selection.absences.clear();
         AppState.selection.certificates.clear();
-        updateCalendarContext();
-        renderCalendar();
+        updateCalendarContext(); // Isso chama o renderCalendar
         updateReceiptPreview();
     };
     DOM.startDate?.addEventListener('change', updateDates);
@@ -224,7 +228,7 @@ function renderEmployeeList() {
         div.innerHTML = `
             <span>${capitalizeWords(emp.nome)}</span>
             <button class="text-red-500 hover:text-red-700 ml-2 delete-btn">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/></svg>
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/></svg>
             </button>
         `;
 
@@ -254,6 +258,9 @@ function updateCalendarContext() {
 
     const start = new Date(AppState.selection.startDate + 'T00:00:00');
     
+    // Regra de visualização do calendário:
+    // VT = mostra o mês anterior
+    // Outros = mostra o mês atual/selecionado
     if (AppState.selection.receiptType === 'valeTransporte') {
         AppState.ui.calendarMonth = start.getMonth() - 1;
         AppState.ui.calendarYear = start.getFullYear();
@@ -316,7 +323,6 @@ function renderCalendar() {
         el.className = 'calendar-day current-month';
         el.textContent = day;
         
-        // MUDANÇA: Verifica na nova lista de feriados
         if (HOLIDAYS_DB.some(h => h.date === isoDate)) el.classList.add('holiday');
         if (AppState.selection.absences.has(isoDate)) el.classList.add('selected-absence');
         if (AppState.selection.certificates.has(isoDate)) el.classList.add('selected-certificate');
