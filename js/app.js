@@ -540,25 +540,44 @@ function handleImport(e) {
     const reader = new FileReader();
     reader.onload = async (ev) => {
         const lines = ev.target.result.split('\n');
+        let importedCount = 0;
+
         for (let line of lines) {
-            const [nome, cpf] = line.split(',');
-            if (nome && cpf && cpf.trim().match(/^\d{3}\.\d{3}\.\d{3}-\d{2}$/)) {
-                const cleanCpf = cpf.trim().replace(/\D/g, '');
-                await setDoc(doc(db, `artifacts/${appId}/public/data/employees`, cleanCpf), { 
-                    nome: capitalizeWords(nome.trim()), 
-                    cpf: cpf.trim() 
-                });
+            // Ignora linhas vazias
+            if (!line.trim()) continue;
+
+            // Divide pelo primeiro separador encontrado (vírgula)
+            const parts = line.split(',');
+            
+            // Verifica se tem pelo menos Nome e CPF
+            if (parts.length >= 2) {
+                const nome = parts[0].trim();
+                const rawCpf = parts[1].trim();
+                
+                // Remove tudo que não for número do CPF para validar
+                const cleanCpf = rawCpf.replace(/\D/g, '');
+
+                // Validação mais flexível: Aceita se tiver 11 dígitos (com ou sem ponto)
+                if (nome && cleanCpf.length === 11) {
+                    
+                    // Formata o CPF para o padrão XXX.XXX.XXX-XX antes de salvar
+                    const formattedCpf = cleanCpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+
+                    await setDoc(doc(db, `artifacts/${appId}/public/data/employees`, cleanCpf), { 
+                        nome: capitalizeWords(nome), 
+                        cpf: formattedCpf 
+                    });
+                    
+                    importedCount++;
+                } else {
+                    console.warn(`Linha ignorada (dados inválidos): ${line}`);
+                }
             }
         }
-        showModal("Importação", "Processo concluído.");
+        showModal("Importação Concluída", `${importedCount} funcionárias foram importadas com sucesso.`);
     };
     reader.readAsText(file);
 }
 
-function showModal(title, msg) {
-    if (DOM.messageModalTitle) DOM.messageModalTitle.textContent = title;
-    if (DOM.messageModalContent) DOM.messageModalContent.textContent = msg;
-    if (DOM.messageModal) DOM.messageModal.classList.remove('hidden');
-}
-
 window.addEventListener('DOMContentLoaded', init);
+
