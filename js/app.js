@@ -1,6 +1,6 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-import { getFirestore, collection, query, onSnapshot, doc, setDoc, deleteDoc, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
+import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-auth.js";
+import { getFirestore, collection, query, onSnapshot, doc, setDoc, deleteDoc, getDocs } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
 
 import { formatCurrency, formatDate, getCurrentDateFormatted, capitalizeWords, numberToWords } from './utils.js';
 import { RECEIPT_CONFIG, HOLIDAYS_DB, calculateWorkingDays, getMarkedDatesInSpecificMonth } from './business.js';
@@ -86,16 +86,18 @@ function cacheDOM() {
     DOM.markTypeRadios = document.querySelectorAll('input[name="markType"]');
 }
 
-// --- FIREBASE ---
+// --- FIREBASE CONFIGURATION (ATUALIZADO) ---
 let db, auth;
+// Mantive o appId genérico caso não venha de variável externa
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
-    apiKey: "AIzaSyAFbb0gWQ51vF92rN-Vis39FHqRAWbzhKE",
-    authDomain: "funcionarias-503a4.firebaseapp.com",
-    projectId: "funcionarias-503a4",
-    storageBucket: "funcionarias-503a4.firebasestorage.app",
-    messagingSenderId: "486757099128",
-    appId: "1:486757099128:web:e4d8c17b61e20d8e2cef8d"
+
+const firebaseConfig = {
+    apiKey: "AIzaSyDWt4fgnCiHECnOF-lNMsvtc1Cwe1SmYXc",
+    authDomain: "controlevenda-ef7db.firebaseapp.com",
+    projectId: "controlevenda-ef7db",
+    storageBucket: "controlevenda-ef7db.firebasestorage.app",
+    messagingSenderId: "468868061475",
+    appId: "1:468868061475:web:dc4bfbf02eeae989a61496"
 };
 
 async function initFirebase() {
@@ -119,11 +121,13 @@ async function initFirebase() {
         });
     } catch (error) {
         console.error("Firebase Error:", error);
-        showModal("Erro de Conexão", "Verifique sua internet.");
+        showModal("Erro de Conexão", "Verifique sua internet ou as configurações do Firebase.");
     }
 }
 
 function setupFirestoreListeners() {
+    // Atenção: Como mudou o projeto, o banco estará vazio inicialmente.
+    // O caminho continua sendo artifacts/default-app-id/public/data/employees
     const employeesRef = collection(db, `artifacts/${appId}/public/data/employees`);
     const q = query(employeesRef);
     onSnapshot(q, (snapshot) => {
@@ -491,6 +495,7 @@ async function handleAddEmployee() {
     
     try {
         const cleanCpf = cpf.replace(/\D/g, '');
+        // Usando o path completo incluindo o appId (mesmo que seja default)
         await setDoc(doc(db, `artifacts/${appId}/public/data/employees`, cleanCpf), { 
             nome: capitalizeWords(nome), 
             cpf: cpf 
