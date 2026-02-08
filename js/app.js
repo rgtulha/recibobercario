@@ -78,7 +78,7 @@ function cacheDOM() {
         'receipt-total', 'receipt-payer', 'receipt-cnpj', 'employee-name', 'employee-cpf',
         'receipt-period-info', 'receipt-daily-value', 'receipt-holidays-info',
         'receipt-total-words-label', 'receipt-total-words', 'employee-signature-name', 'receipt-description',
-        'newReceiptButton' // ID do novo botão adicionado aqui
+        'newReceiptButton'
     ];
 
     ids.forEach(id => {
@@ -118,24 +118,28 @@ async function initFirebase() {
     }
 }
 
-// --- CONTROLE DE LOGIN E UI ---
+// --- CONTROLE DE LOGIN E UI (CORRIGIDO PARA FLUTUAR) ---
 function showLoginForm() {
     const container = DOM['welcome-message'];
     if (!container) return;
     
     container.classList.remove('hidden');
+    // REMOVE AS CLASSES QUE TRAVAM O ALINHAMENTO NO CENTRO
+    container.classList.remove('items-center', 'justify-center'); 
+    
     DOM['receipt-content']?.classList.add('hidden');
 
+    // Adicionado 'sticky top-10' e 'mx-auto' para flutuar e centralizar horizontalmente
     container.innerHTML = `
-        <div class="p-8 bg-white rounded-xl shadow-lg border border-stone-200 max-w-sm mx-auto">
-            <h2 class="text-2xl font-bold text-teal-700 mb-4">Acesso Restrito</h2>
-            <p class="text-stone-600 mb-4 text-sm">Faça login para acessar o sistema.</p>
+        <div class="sticky top-10 z-10 p-8 bg-white rounded-xl shadow-lg border border-stone-200 max-w-sm mx-auto mt-4">
+            <h2 class="text-2xl font-bold text-teal-700 mb-4 text-center">Acesso Restrito</h2>
+            <p class="text-stone-600 mb-4 text-sm text-center">Faça login para acessar o sistema.</p>
             
             <input type="email" id="loginEmail" placeholder="E-mail" class="w-full mb-3 px-3 py-2 border border-stone-300 rounded focus:ring-2 focus:ring-teal-500">
             <input type="password" id="loginPass" placeholder="Senha" class="w-full mb-4 px-3 py-2 border border-stone-300 rounded focus:ring-2 focus:ring-teal-500">
             
             <button id="btnLogin" class="w-full bg-teal-600 text-white py-2 rounded hover:bg-teal-700 transition font-bold">Entrar</button>
-            <p id="loginError" class="text-red-500 text-xs mt-2 hidden"></p>
+            <p id="loginError" class="text-red-500 text-xs mt-2 hidden text-center"></p>
         </div>
     `;
 
@@ -162,12 +166,15 @@ function showLoggedInState() {
     const container = DOM['welcome-message'];
     if (!container) return;
 
-    // AQUI: Adicionadas as classes 'sticky', 'top-8' e 'z-10' para flutuar
+    // REMOVE AS CLASSES QUE TRAVAM O ALINHAMENTO NO CENTRO
+    container.classList.remove('items-center', 'justify-center');
+
+    // Adicionado 'sticky top-10' para acompanhar a rolagem
     container.innerHTML = `
-        <div class="sticky top-8 z-10 p-8 bg-white rounded-xl shadow-lg border border-teal-100 relative">
+        <div class="sticky top-10 z-10 p-8 bg-white rounded-xl shadow-lg border border-teal-100 relative mt-4 text-center">
             <button id="btnLogout" class="absolute top-2 right-2 text-xs text-red-500 hover:underline">Sair</button>
             <h2 class="text-3xl font-bold text-teal-700 mb-2">Gerador de Recibos</h2>
-            <p class="text-stone-600 max-w-md">Logado como: <strong>${AppState.user.email}</strong></p>
+            <p class="text-stone-600 max-w-md mx-auto">Logado como: <strong>${AppState.user.email}</strong></p>
             <p class="text-stone-500 text-sm mt-2">Selecione uma funcionária ao lado para começar.</p>
         </div>
     `;
@@ -234,22 +241,18 @@ function setupEventListeners() {
 
     // --- LÓGICA DO BOTÃO NOVO RECIBO ---
     DOM.newReceiptButton?.addEventListener('click', () => {
-        // 1. Limpa a funcionária selecionada
         AppState.selection.employee = null;
-        
-        // 2. Limpa as faltas e atestados (pois são de outra pessoa)
         AppState.selection.absences.clear();
         AppState.selection.certificates.clear();
 
-        // 3. Troca a visualização
         DOM['receipt-content'].classList.add('hidden');
         DOM['welcome-message'].classList.remove('hidden');
         
-        // 4. Atualiza a UI (Remove seleção da lista e limpa calendário)
+        // Garante que o estado de boas-vindas seja renderizado novamente (resetando classes se necessário)
+        showLoggedInState(); 
+        
         renderEmployeeList();
         renderCalendar();
-
-        // Obs: Mantemos as DATAS e o TIPO DE RECIBO para facilitar lançamentos em lote.
     });
 
     DOM.addEmployeeButton?.addEventListener('click', handleAddEmployee);
