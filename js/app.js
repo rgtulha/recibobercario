@@ -1,12 +1,12 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
-import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-auth.js";
+import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-auth.js";
 import { getFirestore, collection, query, onSnapshot, doc, setDoc, deleteDoc, getDocs } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
 
 import { formatCurrency, formatDate, getCurrentDateFormatted, capitalizeWords, numberToWords } from './utils.js';
 import { RECEIPT_CONFIG, HOLIDAYS_DB, calculateWorkingDays, getMarkedDatesInSpecificMonth } from './business.js';
 
 const AppState = {
-    user: { id: null, isAuthenticated: false },
+    user: { id: null, email: null, isAuthenticated: false },
     employees: [],
     ui: {
         filterText: '',
@@ -27,39 +27,43 @@ const AppState = {
 
 const DOM = {};
 
-// --- INICIALIZAÇÃO ROBUSTA ---
+// --- FIREBASE CONFIG ---
+const appId = '1:468868061475:web:dc4bfbf02eeae989a61496'; // Seu App ID fixo
+const firebaseConfig = {
+    apiKey: "AIzaSyDWt4fgnCiHECnOF-lNMsvtc1Cwe1SmYXc",
+    authDomain: "controlevenda-ef7db.firebaseapp.com",
+    projectId: "controlevenda-ef7db",
+    storageBucket: "controlevenda-ef7db.firebasestorage.app",
+    messagingSenderId: "468868061475",
+    appId: appId
+};
+
+let db, auth;
+
+// --- INICIALIZAÇÃO ---
 async function init() {
     console.log("Iniciando Aplicação...");
     cacheDOM();
     setupEventListeners();
 
-    // 1. Define datas padrão (Hoje)
+    // Configura Datas Iniciais
     const today = new Date();
-    const year = today.getFullYear();
-    const month = today.getMonth();
-    
-    // Formata para YYYY-MM-DD
-    const firstDay = new Date(year, month, 1).toISOString().split('T')[0];
-    const lastDay = new Date(year, month + 1, 0).toISOString().split('T')[0];
+    const firstDay = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+    const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().split('T')[0];
 
-    // 2. Preenche os Inputs Visuais
     if (DOM.startDate) DOM.startDate.value = firstDay;
     if (DOM.endDate) DOM.endDate.value = lastDay;
-
-    // 3. Força a atualização do Estado (AppState) IMEDIATAMENTE
     AppState.selection.startDate = firstDay;
     AppState.selection.endDate = lastDay;
-    AppState.selection.receiptType = 'valeTransporte';
 
-    // 4. Renderiza o Calendário AGORA (Sem esperar nada)
     updateCalendarContext(); 
-    updateReceiptPreview();
-
-    // 5. Só depois conecta ao banco
+    
+    // Inicia Firebase
     await initFirebase();
 }
 
 function cacheDOM() {
+    // Mapeamento dos elementos do HTML
     const ids = [
         'employeeList', 'searchInput', 'welcome-message', 'receipt-content',
         'startDate', 'endDate', 'workingDaysInfo', 'calculateDaysButton', 
@@ -86,58 +90,113 @@ function cacheDOM() {
     DOM.markTypeRadios = document.querySelectorAll('input[name="markType"]');
 }
 
-// --- FIREBASE CONFIGURATION (ATUALIZADO) ---
-let db, auth;
-// Mantive o appId genérico caso não venha de variável externa
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-
-const firebaseConfig = {
-    apiKey: "AIzaSyDWt4fgnCiHECnOF-lNMsvtc1Cwe1SmYXc",
-    authDomain: "controlevenda-ef7db.firebaseapp.com",
-    projectId: "controlevenda-ef7db",
-    storageBucket: "controlevenda-ef7db.firebasestorage.app",
-    messagingSenderId: "468868061475",
-    appId: "1:468868061475:web:dc4bfbf02eeae989a61496"
-};
-
 async function initFirebase() {
     try {
         const app = initializeApp(firebaseConfig);
         auth = getAuth(app);
         db = getFirestore(app);
 
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-        if (initialAuthToken) await signInWithCustomToken(auth, initialAuthToken);
-        else await signInAnonymously(auth);
-
+        // Monitora o estado do login
         onAuthStateChanged(auth, (user) => {
             if (user) {
+                // USUÁRIO LOGADO
                 AppState.user.id = user.uid;
+                AppState.user.email = user.email;
                 AppState.user.isAuthenticated = true;
+                
+                showLoggedInState();
                 setupFirestoreListeners();
             } else {
+                // USUÁRIO DESLOGADO
                 AppState.user.isAuthenticated = false;
+                AppState.employees = [];
+                renderEmployeeList(); // Limpa a lista visual
+                showLoginForm();
             }
         });
+
     } catch (error) {
-        console.error("Firebase Error:", error);
-        showModal("Erro de Conexão", "Verifique sua internet ou as configurações do Firebase.");
+        console.error("Erro Firebase:", error);
+        showModal("Erro Fatal", "Não foi possível conectar ao sistema.");
     }
 }
 
+// --- CONTROLE DE LOGIN (UI Dinâmica) ---
+function showLoginForm() {
+    // Transforma a div de boas-vindas em um formulário de login
+    const container = DOM['welcome-message'];
+    if (!container) return;
+    
+    container.classList.remove('hidden');
+    DOM['receipt-content']?.classList.add('hidden');
+
+    container.innerHTML = `
+        <div class="p-8 bg-white rounded-xl shadow-lg border border-stone-200 max-w-sm mx-auto">
+            <h2 class="text-2xl font-bold text-teal-700 mb-4">Acesso Restrito</h2>
+            <p class="text-stone-600 mb-4 text-sm">Faça login para acessar o sistema.</p>
+            
+            <input type="email" id="loginEmail" placeholder="E-mail" class="w-full mb-3 px-3 py-2 border border-stone-300 rounded focus:ring-2 focus:ring-teal-500">
+            <input type="password" id="loginPass" placeholder="Senha" class="w-full mb-4 px-3 py-2 border border-stone-300 rounded focus:ring-2 focus:ring-teal-500">
+            
+            <button id="btnLogin" class="w-full bg-teal-600 text-white py-2 rounded hover:bg-teal-700 transition font-bold">Entrar</button>
+            <p id="loginError" class="text-red-500 text-xs mt-2 hidden"></p>
+        </div>
+    `;
+
+    // Adiciona evento ao botão criado dinamicamente
+    document.getElementById('btnLogin').addEventListener('click', async () => {
+        const email = document.getElementById('loginEmail').value;
+        const pass = document.getElementById('loginPass').value;
+        const errorMsg = document.getElementById('loginError');
+        
+        errorMsg.classList.add('hidden');
+        document.getElementById('btnLogin').innerText = "Entrando...";
+
+        try {
+            await signInWithEmailAndPassword(auth, email, pass);
+            // O onAuthStateChanged vai lidar com o sucesso
+        } catch (error) {
+            console.error(error);
+            document.getElementById('btnLogin').innerText = "Entrar";
+            errorMsg.textContent = "E-mail ou senha incorretos.";
+            errorMsg.classList.remove('hidden');
+        }
+    });
+}
+
+function showLoggedInState() {
+    // Restaura a mensagem original de boas-vindas e adiciona botão de Sair
+    const container = DOM['welcome-message'];
+    if (!container) return;
+
+    container.innerHTML = `
+        <div class="p-8 bg-white rounded-xl shadow-sm border border-stone-200 relative">
+            <button id="btnLogout" class="absolute top-2 right-2 text-xs text-red-500 hover:underline">Sair</button>
+            <h2 class="text-3xl font-bold text-teal-700 mb-2">Gerador de Recibos</h2>
+            <p class="text-stone-600 max-w-md">Logado como: <strong>${AppState.user.email}</strong></p>
+            <p class="text-stone-500 text-sm mt-2">Selecione uma funcionária ao lado para começar.</p>
+        </div>
+    `;
+
+    document.getElementById('btnLogout').addEventListener('click', () => signOut(auth));
+}
+
 function setupFirestoreListeners() {
-    // Atenção: Como mudou o projeto, o banco estará vazio inicialmente.
-    // O caminho continua sendo artifacts/default-app-id/public/data/employees
     const employeesRef = collection(db, `artifacts/${appId}/public/data/employees`);
     const q = query(employeesRef);
+    
+    // onSnapshot falhará se as regras não permitirem
     onSnapshot(q, (snapshot) => {
         AppState.employees = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         AppState.employees.sort((a, b) => a.nome.localeCompare(b.nome));
         renderEmployeeList();
+    }, (error) => {
+        console.error("Erro de Permissão:", error);
+        showModal("Permissão Negada", "Seu usuário não tem permissão para ler os dados.");
     });
 }
 
-// --- EVENTOS ---
+// --- EVENTOS GERAIS ---
 function setupEventListeners() {
     DOM.searchInput?.addEventListener('keyup', (e) => {
         AppState.ui.filterText = e.target.value;
@@ -203,10 +262,8 @@ function setupEventListeners() {
 function handleInputChanges() {
     if(DOM.startDate?.value) AppState.selection.startDate = DOM.startDate.value;
     if(DOM.endDate?.value) AppState.selection.endDate = DOM.endDate.value;
-    
     const checkedRadio = document.querySelector('input[name="receiptType"]:checked');
     if(checkedRadio) AppState.selection.receiptType = checkedRadio.value;
-    
     toggleReceiptTypeFields();
 }
 
@@ -224,10 +281,15 @@ function toggleReceiptTypeFields() {
     }
 }
 
-// --- RENDERIZAÇÃO DE LISTA ---
+// --- RENDERIZAÇÃO E CRUD ---
 function renderEmployeeList() {
     if (!DOM.employeeList) return;
     DOM.employeeList.innerHTML = '';
+
+    if (!AppState.user.isAuthenticated) {
+        DOM.employeeList.innerHTML = `<p class="text-stone-400 p-4 text-center text-sm">Faça login para ver a lista.</p>`;
+        return;
+    }
     
     const filter = AppState.ui.filterText.toLowerCase();
     const filtered = AppState.employees.filter(emp => emp.nome.toLowerCase().includes(filter));
@@ -243,7 +305,7 @@ function renderEmployeeList() {
         
         div.innerHTML = `
             <span>${capitalizeWords(emp.nome)}</span>
-            <button class="text-red-500 hover:text-red-700 ml-2 delete-btn">
+            <button class="text-red-500 hover:text-red-700 ml-2 delete-btn" title="Excluir">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/></svg>
             </button>
         `;
@@ -269,18 +331,12 @@ function renderEmployeeList() {
     });
 }
 
-// --- CALENDÁRIO ---
+// Funções de Calendário (Mantidas iguais, resumidas aqui para contexto)
 function updateCalendarContext() {
     let start;
-    
-    // Fallback para Hoje se o input estiver vazio
-    if (AppState.selection.startDate) {
-        start = new Date(AppState.selection.startDate + 'T00:00:00');
-    } else {
-        start = new Date(); // Data atual como segurança
-    }
+    if (AppState.selection.startDate) start = new Date(AppState.selection.startDate + 'T00:00:00');
+    else start = new Date();
 
-    // Regra: VT = mês anterior, Outros = mês selecionado
     if (AppState.selection.receiptType === 'valeTransporte') {
         AppState.ui.calendarMonth = start.getMonth() - 1;
         AppState.ui.calendarYear = start.getFullYear();
@@ -292,7 +348,6 @@ function updateCalendarContext() {
         AppState.ui.calendarMonth = start.getMonth();
         AppState.ui.calendarYear = start.getFullYear();
     }
-    
     renderCalendar();
 }
 
@@ -309,11 +364,8 @@ function changeCalendarMonth(delta) {
 }
 
 function renderCalendar() {
-    if (!DOM.calendar) {
-        console.error("DOM Element #calendar não encontrado!");
-        return;
-    }
-    DOM.calendar.innerHTML = ''; // Limpa tudo
+    if (!DOM.calendar) return;
+    DOM.calendar.innerHTML = '';
     
     const year = AppState.ui.calendarYear;
     const month = AppState.ui.calendarMonth;
@@ -326,7 +378,6 @@ function renderCalendar() {
     const daysInMonth = lastDayOfMonth.getDate();
     const startDayOfWeek = firstDayOfMonth.getDay();
 
-    // Dias da Semana
     ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"].forEach(d => {
         const el = document.createElement('div');
         el.className = 'calendar-day header';
@@ -334,14 +385,12 @@ function renderCalendar() {
         DOM.calendar.appendChild(el);
     });
 
-    // Padding (dias vazios)
     for (let i = 0; i < startDayOfWeek; i++) {
         const el = document.createElement('div');
         el.className = 'calendar-day other-month disabled-for-marking';
         DOM.calendar.appendChild(el);
     }
 
-    // Dias Reais
     for (let day = 1; day <= daysInMonth; day++) {
         const date = new Date(year, month, day);
         const isoDate = date.toISOString().split('T')[0];
@@ -391,7 +440,6 @@ function toggleDateSelection(isoDate, el) {
     updateReceiptPreview();
 }
 
-// --- RECIBO ---
 function updateReceiptPreview() {
     if (!AppState.selection.employee) return;
     
@@ -405,16 +453,9 @@ function updateReceiptPreview() {
     const type = AppState.selection.receiptType;
     let start = AppState.selection.startDate;
     let end = AppState.selection.endDate;
-
-    if (!start || !end) {
-        start = new Date().toISOString().split('T')[0];
-        end = start;
-    }
+    if (!start || !end) { start = new Date().toISOString().split('T')[0]; end = start; }
 
     const calculations = calculateWorkingDays(start, end, AppState.selection.absences, AppState.selection.certificates);
-    
-    // --- NOVO: Linha de Período ---
-    // Cria a string do período: "Período: DD/MM/AAAA até DD/MM/AAAA"
     const periodString = `<strong>Período:</strong> ${formatDate(start)} até ${formatDate(end)}<br>`;
 
     let totalValue = 0;
@@ -423,19 +464,14 @@ function updateReceiptPreview() {
 
     if (type === 'valeTransporte') {
         DOM['receipt-title'].textContent = "Recibo de Vale Transporte";
-        
         const totalBusinessDays = calculations.effectiveDays + calculations.absenceCount + calculations.certificateCount; 
-        
         const prevMonthAbsences = AppState.selection.absences.size; 
         const prevMonthCerts = AppState.selection.certificates.size;
-
         const effectiveDaysForVT = totalBusinessDays - (prevMonthAbsences + prevMonthCerts);
         totalValue = effectiveDaysForVT * RECEIPT_CONFIG.dailyValue;
         if(totalValue < 0) totalValue = 0; 
 
         descriptionText = "REFERENTE AO VALE TRANSPORTE";
-        
-        // Inserimos o periodString no início
         detailsHtml = `
             ${periodString}
             <strong>Valor Diário:</strong> ${formatCurrency(RECEIPT_CONFIG.dailyValue)}<br>
@@ -446,13 +482,11 @@ function updateReceiptPreview() {
     else if (type === 'salarioEstagiario') {
         DOM['receipt-title'].textContent = "Recibo Bolsa Estágio";
         descriptionText = `REFERENTE À BOLSA ESTÁGIO (${AppState.selection.internPeriod === 'matutino' ? 'Matutino' : 'Vespertino'})`;
-        
         const dailyAllowance = RECEIPT_CONFIG.monthlyAllowance / 30;
         const discount = calculations.absenceCount * dailyAllowance;
         totalValue = RECEIPT_CONFIG.monthlyAllowance - discount;
         if(totalValue < 0) totalValue = 0;
 
-        // Inserimos o periodString no início
         detailsHtml = `
             ${periodString}
             <strong>Valor Mensal:</strong> ${formatCurrency(RECEIPT_CONFIG.monthlyAllowance)}<br>
@@ -462,14 +496,11 @@ function updateReceiptPreview() {
     else if (type === 'bonificacao') {
         DOM['receipt-title'].textContent = "Recibo de Bonificação";
         descriptionText = "REFERENTE À BONIFICAÇÃO";
-        
         if (calculations.absenceCount > 0 || calculations.certificateCount > 0) {
             totalValue = 0;
-            // Inserimos o periodString mesmo em caso de cancelamento
             detailsHtml = `${periodString}<span class="text-red-600 font-bold">Bonificação cancelada devido a faltas/atestados.</span>`;
         } else {
             totalValue = RECEIPT_CONFIG.fixedBonusAmount;
-            // Inserimos o periodString no início
             detailsHtml = `${periodString}<strong>Valor Integral:</strong> ${formatCurrency(totalValue)}`;
         }
     }
@@ -486,44 +517,30 @@ function updateReceiptPreview() {
     }
 }
 
-// --- MODAIS E CRUD ---
- 
+// --- BANCO DE DADOS (CRUD) ---
 async function handleAddEmployee() {
     const nome = DOM.newEmployeeName.value.trim();
     let cpf = DOM.newEmployeeCpf.value.trim();
     
     if (!nome || !cpf) return showModal("Erro", "Preencha todos os campos.");
     
-    // 1. Limpa o CPF (deixa só números)
+    // Limpa e Valida
     const cleanCpf = cpf.replace(/\D/g, '');
-
-    // 2. Valida se tem 11 dígitos
-    if (cleanCpf.length !== 11) {
-        return showModal("Erro", "O CPF deve ter exatamente 11 números.");
-    }
-
-    // 3. Formata para o padrão visual (XXX.XXX.XXX-XX)
+    if (cleanCpf.length !== 11) return showModal("Erro", "O CPF deve ter 11 dígitos.");
     const formattedCpf = cleanCpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
     
     try {
-        // Salva no banco (ID = números puros, Dados = CPF formatado)
         await setDoc(doc(db, `artifacts/${appId}/public/data/employees`, cleanCpf), { 
             nome: capitalizeWords(nome), 
             cpf: formattedCpf 
         });
-        
-        showModal("Sucesso", "Funcionária adicionada!");
+        showModal("Sucesso", "Funcionária adicionada.");
         DOM.newEmployeeName.value = '';
         DOM.newEmployeeCpf.value = '';
     } catch (e) {
-        console.error("Erro ao adicionar:", e);
-        
-        // Verifica se é erro de permissão do Firebase
-        if (e.code === 'permission-denied') {
-            showModal("Erro de Permissão", "O banco de dados bloqueou a gravação. Verifique as Regras (Rules) no console do Firebase.");
-        } else {
-            showModal("Erro", "Não foi possível salvar. Veja o console (F12) para detalhes.");
-        }
+        console.error(e);
+        if (e.code === 'permission-denied') showModal("Sem Permissão", "Você precisa estar logado para salvar.");
+        else showModal("Erro", "Falha ao salvar no banco.");
     }
 }
 
@@ -538,7 +555,7 @@ async function handleDeleteEmployee() {
             DOM['receipt-content'].classList.add('hidden');
         }
     } catch (e) {
-        showModal("Erro", "Falha ao excluir.");
+        showModal("Erro", "Falha ao excluir. Verifique se está logado.");
     }
 }
 
@@ -558,45 +575,31 @@ function handleImport(e) {
     const reader = new FileReader();
     reader.onload = async (ev) => {
         const lines = ev.target.result.split('\n');
-        let importedCount = 0;
-
+        let count = 0;
         for (let line of lines) {
-            // Ignora linhas vazias
             if (!line.trim()) continue;
-
-            // Divide pelo primeiro separador encontrado (vírgula)
             const parts = line.split(',');
-            
-            // Verifica se tem pelo menos Nome e CPF
             if (parts.length >= 2) {
                 const nome = parts[0].trim();
-                const rawCpf = parts[1].trim();
-                
-                // Remove tudo que não for número do CPF para validar
-                const cleanCpf = rawCpf.replace(/\D/g, '');
-
-                // Validação mais flexível: Aceita se tiver 11 dígitos (com ou sem ponto)
+                const cleanCpf = parts[1].trim().replace(/\D/g, '');
                 if (nome && cleanCpf.length === 11) {
-                    
-                    // Formata o CPF para o padrão XXX.XXX.XXX-XX antes de salvar
                     const formattedCpf = cleanCpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
-
-                    await setDoc(doc(db, `artifacts/${appId}/public/data/employees`, cleanCpf), { 
-                        nome: capitalizeWords(nome), 
-                        cpf: formattedCpf 
-                    });
-                    
-                    importedCount++;
-                } else {
-                    console.warn(`Linha ignorada (dados inválidos): ${line}`);
+                    try {
+                        await setDoc(doc(db, `artifacts/${appId}/public/data/employees`, cleanCpf), { nome: capitalizeWords(nome), cpf: formattedCpf });
+                        count++;
+                    } catch(e) { console.error("Erro import:", e); }
                 }
             }
         }
-        showModal("Importação Concluída", `${importedCount} funcionárias foram importadas com sucesso.`);
+        showModal("Importação", `${count} funcionárias importadas.`);
     };
     reader.readAsText(file);
 }
 
+function showModal(title, msg) {
+    if (DOM.messageModalTitle) DOM.messageModalTitle.textContent = title;
+    if (DOM.messageModalContent) DOM.messageModalContent.textContent = msg;
+    if (DOM.messageModal) DOM.messageModal.classList.remove('hidden');
+}
+
 window.addEventListener('DOMContentLoaded', init);
-
-
