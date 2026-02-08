@@ -9,13 +9,14 @@ export const RECEIPT_CONFIG = {
     cnpj: "32.741.557/0001-70",
     description: "REFERENTE AO VALE TRANSPORTE",
     location: "Goiânia",
-    dailyValue: 8.60,         
+    dailyValue: 8.60,          
     fixedBonusAmount: 200.00, 
     monthlyAllowance: 1100.00 
 };
 
 /**
  * Lista Completa de Feriados (2025-2030)
+ * Atualizado com Recesso Escolar em 16/02/2026
  */
 export const HOLIDAYS_DB = [
     // --- 2025 ---
@@ -37,8 +38,9 @@ export const HOLIDAYS_DB = [
 
     // --- 2026 ---
     {date: "2026-01-01", name: "Confraternização Universal"},
+    {date: "2026-02-16", name: "Recesso Escolar"}, // ADICIONADO
     {date: "2026-02-17", name: "Carnaval"}, 
-    {date: "2026-04-03", name: "Sexta-feira Santa"},
+    {date: "2026-04-03", name: "Sexta-feira Santa"}, 
     {date: "2026-04-21", name: "Tiradentes"},
     {date: "2026-05-01", name: "Dia do Trabalhador"},
     {date: "2026-05-24", name: "Nossa Senhora Auxiliadora"},
