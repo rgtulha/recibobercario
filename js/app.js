@@ -203,6 +203,7 @@ function setupEventListeners() {
         renderEmployeeList();
     });
 
+    
     const updateDates = () => {
         AppState.selection.startDate = DOM.startDate.value;
         AppState.selection.endDate = DOM.endDate.value;
@@ -221,6 +222,11 @@ function setupEventListeners() {
             updateCalendarContext();
             updateReceiptPreview();
         });
+    });
+
+    DOM.internPeriod?.addEventListener('change', (e) => {
+        AppState.selection.internPeriod = e.target.value;
+        updateReceiptPreview();
     });
 
     DOM.prevMonth?.addEventListener('click', () => changeCalendarMonth(-1));
@@ -603,3 +609,4 @@ function showModal(title, msg) {
 }
 
 window.addEventListener('DOMContentLoaded', init);
+
