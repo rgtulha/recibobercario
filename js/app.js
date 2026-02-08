@@ -28,7 +28,7 @@ const AppState = {
 const DOM = {};
 
 // --- FIREBASE CONFIG ---
-const appId = '1:468868061475:web:dc4bfbf02eeae989a61496'; // Seu App ID fixo
+const appId = '1:468868061475:web:dc4bfbf02eeae989a61496'; 
 const firebaseConfig = {
     apiKey: "AIzaSyDWt4fgnCiHECnOF-lNMsvtc1Cwe1SmYXc",
     authDomain: "controlevenda-ef7db.firebaseapp.com",
@@ -63,7 +63,6 @@ async function init() {
 }
 
 function cacheDOM() {
-    // Mapeamento dos elementos do HTML
     const ids = [
         'employeeList', 'searchInput', 'welcome-message', 'receipt-content',
         'startDate', 'endDate', 'workingDaysInfo', 'calculateDaysButton', 
@@ -78,7 +77,8 @@ function cacheDOM() {
         'deleteConfirmationModal', 'deleteEmployeeName', 'cancelDeleteButton', 'confirmDeleteButton',
         'receipt-total', 'receipt-payer', 'receipt-cnpj', 'employee-name', 'employee-cpf',
         'receipt-period-info', 'receipt-daily-value', 'receipt-holidays-info',
-        'receipt-total-words-label', 'receipt-total-words', 'employee-signature-name', 'receipt-description'
+        'receipt-total-words-label', 'receipt-total-words', 'employee-signature-name', 'receipt-description',
+        'newReceiptButton' // ID do novo botão adicionado aqui
     ];
 
     ids.forEach(id => {
@@ -96,10 +96,8 @@ async function initFirebase() {
         auth = getAuth(app);
         db = getFirestore(app);
 
-        // Monitora o estado do login
         onAuthStateChanged(auth, (user) => {
             if (user) {
-                // USUÁRIO LOGADO
                 AppState.user.id = user.uid;
                 AppState.user.email = user.email;
                 AppState.user.isAuthenticated = true;
@@ -107,10 +105,9 @@ async function initFirebase() {
                 showLoggedInState();
                 setupFirestoreListeners();
             } else {
-                // USUÁRIO DESLOGADO
                 AppState.user.isAuthenticated = false;
                 AppState.employees = [];
-                renderEmployeeList(); // Limpa a lista visual
+                renderEmployeeList(); 
                 showLoginForm();
             }
         });
@@ -121,9 +118,8 @@ async function initFirebase() {
     }
 }
 
-// --- CONTROLE DE LOGIN (UI Dinâmica) ---
+// --- CONTROLE DE LOGIN E UI ---
 function showLoginForm() {
-    // Transforma a div de boas-vindas em um formulário de login
     const container = DOM['welcome-message'];
     if (!container) return;
     
@@ -143,7 +139,6 @@ function showLoginForm() {
         </div>
     `;
 
-    // Adiciona evento ao botão criado dinamicamente
     document.getElementById('btnLogin').addEventListener('click', async () => {
         const email = document.getElementById('loginEmail').value;
         const pass = document.getElementById('loginPass').value;
@@ -154,7 +149,6 @@ function showLoginForm() {
 
         try {
             await signInWithEmailAndPassword(auth, email, pass);
-            // O onAuthStateChanged vai lidar com o sucesso
         } catch (error) {
             console.error(error);
             document.getElementById('btnLogin').innerText = "Entrar";
@@ -165,12 +159,12 @@ function showLoginForm() {
 }
 
 function showLoggedInState() {
-    // Restaura a mensagem original de boas-vindas e adiciona botão de Sair
     const container = DOM['welcome-message'];
     if (!container) return;
 
+    // AQUI: Adicionadas as classes 'sticky', 'top-8' e 'z-10' para flutuar
     container.innerHTML = `
-        <div class="p-8 bg-white rounded-xl shadow-sm border border-stone-200 relative">
+        <div class="sticky top-8 z-10 p-8 bg-white rounded-xl shadow-lg border border-teal-100 relative">
             <button id="btnLogout" class="absolute top-2 right-2 text-xs text-red-500 hover:underline">Sair</button>
             <h2 class="text-3xl font-bold text-teal-700 mb-2">Gerador de Recibos</h2>
             <p class="text-stone-600 max-w-md">Logado como: <strong>${AppState.user.email}</strong></p>
@@ -185,25 +179,22 @@ function setupFirestoreListeners() {
     const employeesRef = collection(db, `artifacts/${appId}/public/data/employees`);
     const q = query(employeesRef);
     
-    // onSnapshot falhará se as regras não permitirem
     onSnapshot(q, (snapshot) => {
         AppState.employees = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         AppState.employees.sort((a, b) => a.nome.localeCompare(b.nome));
         renderEmployeeList();
     }, (error) => {
         console.error("Erro de Permissão:", error);
-        showModal("Permissão Negada", "Seu usuário não tem permissão para ler os dados.");
     });
 }
 
-// --- EVENTOS GERAIS ---
+// --- EVENTOS ---
 function setupEventListeners() {
     DOM.searchInput?.addEventListener('keyup', (e) => {
         AppState.ui.filterText = e.target.value;
         renderEmployeeList();
     });
 
-    
     const updateDates = () => {
         AppState.selection.startDate = DOM.startDate.value;
         AppState.selection.endDate = DOM.endDate.value;
@@ -224,6 +215,7 @@ function setupEventListeners() {
         });
     });
 
+    // Correção Matutino/Vespertino
     DOM.internPeriod?.addEventListener('change', (e) => {
         AppState.selection.internPeriod = e.target.value;
         updateReceiptPreview();
@@ -238,6 +230,26 @@ function setupEventListeners() {
         AppState.selection.certificates.clear();
         renderCalendar();
         updateReceiptPreview();
+    });
+
+    // --- LÓGICA DO BOTÃO NOVO RECIBO ---
+    DOM.newReceiptButton?.addEventListener('click', () => {
+        // 1. Limpa a funcionária selecionada
+        AppState.selection.employee = null;
+        
+        // 2. Limpa as faltas e atestados (pois são de outra pessoa)
+        AppState.selection.absences.clear();
+        AppState.selection.certificates.clear();
+
+        // 3. Troca a visualização
+        DOM['receipt-content'].classList.add('hidden');
+        DOM['welcome-message'].classList.remove('hidden');
+        
+        // 4. Atualiza a UI (Remove seleção da lista e limpa calendário)
+        renderEmployeeList();
+        renderCalendar();
+
+        // Obs: Mantemos as DATAS e o TIPO DE RECIBO para facilitar lançamentos em lote.
     });
 
     DOM.addEmployeeButton?.addEventListener('click', handleAddEmployee);
@@ -337,7 +349,6 @@ function renderEmployeeList() {
     });
 }
 
-// Funções de Calendário (Mantidas iguais, resumidas aqui para contexto)
 function updateCalendarContext() {
     let start;
     if (AppState.selection.startDate) start = new Date(AppState.selection.startDate + 'T00:00:00');
@@ -523,14 +534,13 @@ function updateReceiptPreview() {
     }
 }
 
-// --- BANCO DE DADOS (CRUD) ---
+// --- CRUD E ARQUIVOS ---
 async function handleAddEmployee() {
     const nome = DOM.newEmployeeName.value.trim();
     let cpf = DOM.newEmployeeCpf.value.trim();
     
     if (!nome || !cpf) return showModal("Erro", "Preencha todos os campos.");
     
-    // Limpa e Valida
     const cleanCpf = cpf.replace(/\D/g, '');
     if (cleanCpf.length !== 11) return showModal("Erro", "O CPF deve ter 11 dígitos.");
     const formattedCpf = cleanCpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
@@ -609,4 +619,3 @@ function showModal(title, msg) {
 }
 
 window.addEventListener('DOMContentLoaded', init);
-
