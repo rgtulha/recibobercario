@@ -487,25 +487,43 @@ function updateReceiptPreview() {
 }
 
 // --- MODAIS E CRUD ---
+ 
 async function handleAddEmployee() {
     const nome = DOM.newEmployeeName.value.trim();
-    const cpf = DOM.newEmployeeCpf.value.trim();
+    let cpf = DOM.newEmployeeCpf.value.trim();
     
     if (!nome || !cpf) return showModal("Erro", "Preencha todos os campos.");
     
+    // 1. Limpa o CPF (deixa só números)
+    const cleanCpf = cpf.replace(/\D/g, '');
+
+    // 2. Valida se tem 11 dígitos
+    if (cleanCpf.length !== 11) {
+        return showModal("Erro", "O CPF deve ter exatamente 11 números.");
+    }
+
+    // 3. Formata para o padrão visual (XXX.XXX.XXX-XX)
+    const formattedCpf = cleanCpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+    
     try {
-        const cleanCpf = cpf.replace(/\D/g, '');
-        // Usando o path completo incluindo o appId (mesmo que seja default)
+        // Salva no banco (ID = números puros, Dados = CPF formatado)
         await setDoc(doc(db, `artifacts/${appId}/public/data/employees`, cleanCpf), { 
             nome: capitalizeWords(nome), 
-            cpf: cpf 
+            cpf: formattedCpf 
         });
-        showModal("Sucesso", "Funcionária adicionada.");
+        
+        showModal("Sucesso", "Funcionária adicionada!");
         DOM.newEmployeeName.value = '';
         DOM.newEmployeeCpf.value = '';
     } catch (e) {
-        console.error(e);
-        showModal("Erro", "Falha ao salvar.");
+        console.error("Erro ao adicionar:", e);
+        
+        // Verifica se é erro de permissão do Firebase
+        if (e.code === 'permission-denied') {
+            showModal("Erro de Permissão", "O banco de dados bloqueou a gravação. Verifique as Regras (Rules) no console do Firebase.");
+        } else {
+            showModal("Erro", "Não foi possível salvar. Veja o console (F12) para detalhes.");
+        }
     }
 }
 
@@ -580,4 +598,5 @@ function handleImport(e) {
 }
 
 window.addEventListener('DOMContentLoaded', init);
+
 
