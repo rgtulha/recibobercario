@@ -223,8 +223,10 @@ function setupEventListeners() {
         updateReceiptPreview();
     });
 
+    // Alterado para sincronizar com os inputs
     DOM.prevMonth?.addEventListener('click', () => changeCalendarMonth(-1));
     DOM.nextMonth?.addEventListener('click', () => changeCalendarMonth(1));
+    
     DOM.markTypeRadios.forEach(radio => radio.addEventListener('change', (e) => AppState.ui.currentMarkType = e.target.value));
     
     DOM.clearMarkingButton?.addEventListener('click', () => {
@@ -344,26 +346,26 @@ function renderEmployeeList() {
     });
 }
 
+// --- SINCRONIZAÇÃO TOTAL: ITEM 3 <-> ITEM 4 ---
+
 function updateCalendarContext() {
     let start;
-    if (AppState.selection.startDate) start = new Date(AppState.selection.startDate + 'T00:00:00');
-    else start = new Date();
-
-    if (AppState.selection.receiptType === 'valeTransporte') {
-        AppState.ui.calendarMonth = start.getMonth() - 1;
-        AppState.ui.calendarYear = start.getFullYear();
-        if (AppState.ui.calendarMonth < 0) {
-            AppState.ui.calendarMonth = 11;
-            AppState.ui.calendarYear--;
-        }
+    if (AppState.selection.startDate) {
+        // Garante a data correta adicionando o horário para evitar fuso horário voltando dia
+        start = new Date(AppState.selection.startDate + 'T12:00:00');
     } else {
-        AppState.ui.calendarMonth = start.getMonth();
-        AppState.ui.calendarYear = start.getFullYear();
+        start = new Date();
     }
+
+    // FORÇA O CALENDÁRIO A SER IGUAL À DATA DE INÍCIO (Sincronia 1: Input -> Calendário)
+    AppState.ui.calendarMonth = start.getMonth();
+    AppState.ui.calendarYear = start.getFullYear();
+    
     renderCalendar();
 }
 
 function changeCalendarMonth(delta) {
+    // 1. Muda o mês do calendário visual
     AppState.ui.calendarMonth += delta;
     if (AppState.ui.calendarMonth > 11) {
         AppState.ui.calendarMonth = 0;
@@ -372,7 +374,34 @@ function changeCalendarMonth(delta) {
         AppState.ui.calendarMonth = 11;
         AppState.ui.calendarYear--;
     }
+
+    // 2. FORÇA OS INPUTS A SEREM IGUAIS AO NOVO MÊS (Sincronia 2: Calendário -> Input)
+    const year = AppState.ui.calendarYear;
+    const month = AppState.ui.calendarMonth; // 0-11
+
+    // Primeiro dia do mês novo
+    const firstDay = 1;
+    // Último dia do mês novo
+    const lastDay = new Date(year, month + 1, 0).getDate();
+
+    // Formata YYYY-MM-DD
+    const strMonth = String(month + 1).padStart(2, '0');
+    const strFirst = String(firstDay).padStart(2, '0');
+    const strLast = String(lastDay).padStart(2, '0');
+
+    const newStart = `${year}-${strMonth}-${strFirst}`;
+    const newEnd = `${year}-${strMonth}-${strLast}`;
+
+    // Atualiza o DOM (Inputs)
+    if(DOM.startDate) DOM.startDate.value = newStart;
+    if(DOM.endDate) DOM.endDate.value = newEnd;
+
+    // Atualiza o Estado
+    AppState.selection.startDate = newStart;
+    AppState.selection.endDate = newEnd;
+
     renderCalendar();
+    updateReceiptPreview();
 }
 
 function renderCalendar() {
@@ -497,21 +526,15 @@ function updateReceiptPreview() {
         const totalBusinessDays = calculations.effectiveDays + calculations.absenceCount + calculations.certificateCount; 
         const prevMonthAbsences = AppState.selection.absences.size; 
         
-        // CORREÇÃO: Não subtrai os atestados do cálculo financeiro
         const effectiveDaysForVT = totalBusinessDays - prevMonthAbsences;
-        
         totalValue = effectiveDaysForVT * RECEIPT_CONFIG.dailyValue;
         if(totalValue < 0) totalValue = 0; 
 
         descriptionText = "REFERENTE AO VALE TRANSPORTE";
         
-        // Monta o HTML: Atestados aparecem sem o rótulo "Descontos"
         let discountDetails = '';
         if (absenceList) discountDetails += `<div class="text-red-600">Descontos (Faltas): ${absenceList}</div>`;
-        
-        // CORREÇÃO: Atestados apenas listados, com cor neutra
         if (certList) discountDetails += `<div class="text-stone-600">Atestados: ${certList}</div>`;
-        
         if (!absenceList && !certList) discountDetails = '<div class="text-stone-500 text-xs">Sem descontos ou atestados</div>';
 
         detailsHtml = `
@@ -531,10 +554,7 @@ function updateReceiptPreview() {
 
         let details = '';
         if (absenceList) details += `<div class="text-red-600">Faltas descontadas: ${absenceList}</div>`;
-        
-        // CORREÇÃO: Adicionada a listagem de atestados para Estagiário
         if (certList) details += `<div class="text-stone-600">Atestados: ${certList}</div>`;
-        
         if (!absenceList && !certList) details = '<div class="text-stone-500 text-xs">Sem faltas ou atestados</div>';
 
         detailsHtml = `
