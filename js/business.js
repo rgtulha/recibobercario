@@ -38,7 +38,7 @@ export const HOLIDAYS_DB = [
 
     // --- 2026 ---
     {date: "2026-01-01", name: "Confraternização Universal"},
-    {date: "2026-02-16", name: "Recesso Escolar"}, // ADICIONADO
+    {date: "2026-02-16", name: "Recesso Escolar"},
     {date: "2026-02-17", name: "Carnaval"}, 
     {date: "2026-04-03", name: "Sexta-feira Santa"}, 
     {date: "2026-04-21", name: "Tiradentes"},
@@ -124,15 +124,21 @@ export function calculateWorkingDays(startDate, endDate, absencesSet, certificat
     let certificateCount = 0;
     let holidaysFound = [];
 
-    const start = new Date(startDate);
-    const end = new Date(endDate);
+    // CORREÇÃO CRÍTICA: Adicionamos 'T12:00:00' para forçar a data a ser meio-dia.
+    // Isso evita que o fuso horário (UTC vs Local) jogue a data para o dia anterior (21h do dia anterior),
+    // o que causava o erro de contagem de dias.
+    const start = new Date(startDate + 'T12:00:00');
+    const end = new Date(endDate + 'T12:00:00');
     const currentDate = new Date(start);
 
     while (currentDate <= end) {
-        const dayOfWeek = currentDate.getDay();
+        const dayOfWeek = currentDate.getDay(); // Agora retornará o dia correto
         const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6); 
         
+        // Mantemos isoDateString usando toISOString(), que no fuso Brasil (UTC-3)
+        // meio-dia (12h) vira 15h UTC, mantendo o mesmo dia. Seguro.
         const isoDateString = currentDate.toISOString().split('T')[0];
+        
         const holiday = HOLIDAYS_DB.find(h => h.date === isoDateString);
         const isHoliday = holiday !== undefined;
 
@@ -150,6 +156,7 @@ export function calculateWorkingDays(startDate, endDate, absencesSet, certificat
             holidaysFound.push(holiday);
         }
 
+        // Avança 1 dia mantendo o horário (meio-dia)
         currentDate.setDate(currentDate.getDate() + 1);
     }
 
@@ -166,7 +173,7 @@ export function getMarkedDatesInSpecificMonth(globalMarkedDatesSet, year, monthI
     const endOfMonth = new Date(year, monthIndex + 1, 0);
     
     const filteredDates = Array.from(globalMarkedDatesSet).filter(dateString => {
-        const date = new Date(dateString + 'T00:00:00'); 
+        const date = new Date(dateString + 'T12:00:00'); // Mesmo ajuste aqui por segurança
         return date >= startOfMonth && date <= endOfMonth;
     });
     
