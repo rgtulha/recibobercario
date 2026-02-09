@@ -27,22 +27,23 @@ const AppState = {
 
 const DOM = {};
 
-// --- FIREBASE CONFIG ---
-const appId = '1:468868061475:web:dc4bfbf02eeae989a61496'; 
+// --- FIREBASE CONFIG (BERÇÁRIO CRESCER KIDS) ---
 const firebaseConfig = {
     apiKey: "AIzaSyDWt4fgnCiHECnOF-lNMsvtc1Cwe1SmYXc",
     authDomain: "controlevenda-ef7db.firebaseapp.com",
     projectId: "controlevenda-ef7db",
     storageBucket: "controlevenda-ef7db.firebasestorage.app",
     messagingSenderId: "468868061475",
-    appId: appId
+    appId: "1:468868061475:web:dc4bfbf02eeae989a61496"
 };
+
+const appId = firebaseConfig.appId; 
 
 let db, auth;
 
 // --- INICIALIZAÇÃO ---
 async function init() {
-    console.log("Iniciando Aplicação...");
+    console.log("Iniciando Aplicação - Berçário Crescer Kids...");
     cacheDOM();
     setupEventListeners();
 
@@ -114,22 +115,19 @@ async function initFirebase() {
 
     } catch (error) {
         console.error("Erro Firebase:", error);
-        showModal("Erro Fatal", "Não foi possível conectar ao sistema.");
+        showModal("Erro de Configuração", "Verifique a conexão.");
     }
 }
 
-// --- CONTROLE DE LOGIN E UI (CORRIGIDO PARA FLUTUAR) ---
+// --- CONTROLE DE LOGIN E UI ---
 function showLoginForm() {
     const container = DOM['welcome-message'];
     if (!container) return;
     
     container.classList.remove('hidden');
-    // REMOVE AS CLASSES QUE TRAVAM O ALINHAMENTO NO CENTRO
     container.classList.remove('items-center', 'justify-center'); 
-    
     DOM['receipt-content']?.classList.add('hidden');
 
-    // Adicionado 'sticky top-10' e 'mx-auto' para flutuar e centralizar horizontalmente
     container.innerHTML = `
         <div class="sticky top-10 z-10 p-8 bg-white rounded-xl shadow-lg border border-stone-200 max-w-sm mx-auto mt-4">
             <h2 class="text-2xl font-bold text-teal-700 mb-4 text-center">Acesso Restrito</h2>
@@ -166,10 +164,8 @@ function showLoggedInState() {
     const container = DOM['welcome-message'];
     if (!container) return;
 
-    // REMOVE AS CLASSES QUE TRAVAM O ALINHAMENTO NO CENTRO
     container.classList.remove('items-center', 'justify-center');
 
-    // Adicionado 'sticky top-10' para acompanhar a rolagem
     container.innerHTML = `
         <div class="sticky top-10 z-10 p-8 bg-white rounded-xl shadow-lg border border-teal-100 relative mt-4 text-center">
             <button id="btnLogout" class="absolute top-2 right-2 text-xs text-red-500 hover:underline">Sair</button>
@@ -222,7 +218,6 @@ function setupEventListeners() {
         });
     });
 
-    // Correção Matutino/Vespertino
     DOM.internPeriod?.addEventListener('change', (e) => {
         AppState.selection.internPeriod = e.target.value;
         updateReceiptPreview();
@@ -239,7 +234,6 @@ function setupEventListeners() {
         updateReceiptPreview();
     });
 
-    // --- LÓGICA DO BOTÃO NOVO RECIBO ---
     DOM.newReceiptButton?.addEventListener('click', () => {
         AppState.selection.employee = null;
         AppState.selection.absences.clear();
@@ -248,9 +242,7 @@ function setupEventListeners() {
         DOM['receipt-content'].classList.add('hidden');
         DOM['welcome-message'].classList.remove('hidden');
         
-        // Garante que o estado de boas-vindas seja renderizado novamente (resetando classes se necessário)
         showLoggedInState(); 
-        
         renderEmployeeList();
         renderCalendar();
     });
@@ -478,6 +470,24 @@ function updateReceiptPreview() {
     const calculations = calculateWorkingDays(start, end, AppState.selection.absences, AppState.selection.certificates);
     const periodString = `<strong>Período:</strong> ${formatDate(start)} até ${formatDate(end)}<br>`;
 
+    // --- LÓGICA PARA FORMATAR A LISTA DE DATAS ---
+    const getFormattedList = (set) => {
+        const s = new Date(start);
+        const e = new Date(end);
+        const list = Array.from(set)
+            .filter(dtStr => {
+                const dt = new Date(dtStr + 'T00:00:00');
+                return dt >= s && dt <= e;
+            })
+            .sort()
+            .map(dt => formatDate(dt));
+        
+        return list.length > 0 ? list.join(', ') : null;
+    };
+
+    const absenceList = getFormattedList(AppState.selection.absences);
+    const certList = getFormattedList(AppState.selection.certificates);
+
     let totalValue = 0;
     let descriptionText = '';
     let detailsHtml = '';
@@ -492,11 +502,18 @@ function updateReceiptPreview() {
         if(totalValue < 0) totalValue = 0; 
 
         descriptionText = "REFERENTE AO VALE TRANSPORTE";
+        
+        // Monta o HTML das linhas de desconto detalhado
+        let discountDetails = '';
+        if (absenceList) discountDetails += `<div class="text-red-600">Descontos (Faltas): ${absenceList}</div>`;
+        if (certList) discountDetails += `<div class="text-green-700">Descontos (Atestados): ${certList}</div>`;
+        if (!absenceList && !certList) discountDetails = '<div class="text-stone-500 text-xs">Sem descontos</div>';
+
         detailsHtml = `
             ${periodString}
             <strong>Valor Diário:</strong> ${formatCurrency(RECEIPT_CONFIG.dailyValue)}<br>
             <strong>Dias Úteis no Período:</strong> ${totalBusinessDays}<br>
-            <span class="text-red-600">Descontos (Mês Anterior): ${prevMonthAbsences + prevMonthCerts} dias</span>
+            ${discountDetails}
         `;
     } 
     else if (type === 'salarioEstagiario') {
@@ -507,10 +524,12 @@ function updateReceiptPreview() {
         totalValue = RECEIPT_CONFIG.monthlyAllowance - discount;
         if(totalValue < 0) totalValue = 0;
 
+        let discountLine = absenceList ? `<span class="text-red-600">Faltas descontadas: ${absenceList}</span>` : 'Sem faltas';
+
         detailsHtml = `
             ${periodString}
             <strong>Valor Mensal:</strong> ${formatCurrency(RECEIPT_CONFIG.monthlyAllowance)}<br>
-            <span class="text-red-600">Faltas descontadas: ${calculations.absenceCount} dias</span>
+            ${discountLine}
         `;
     }
     else if (type === 'bonificacao') {
@@ -518,7 +537,11 @@ function updateReceiptPreview() {
         descriptionText = "REFERENTE À BONIFICAÇÃO";
         if (calculations.absenceCount > 0 || calculations.certificateCount > 0) {
             totalValue = 0;
-            detailsHtml = `${periodString}<span class="text-red-600 font-bold">Bonificação cancelada devido a faltas/atestados.</span>`;
+            let motive = [];
+            if(absenceList) motive.push(`Faltas: ${absenceList}`);
+            if(certList) motive.push(`Atestados: ${certList}`);
+            
+            detailsHtml = `${periodString}<span class="text-red-600 font-bold">Bonificação cancelada.</span><br><span class="text-xs text-red-500">Motivo: ${motive.join(' / ')}</span>`;
         } else {
             totalValue = RECEIPT_CONFIG.fixedBonusAmount;
             detailsHtml = `${periodString}<strong>Valor Integral:</strong> ${formatCurrency(totalValue)}`;
