@@ -223,7 +223,6 @@ function setupEventListeners() {
         updateReceiptPreview();
     });
 
-    // Alterado para sincronizar com os inputs
     DOM.prevMonth?.addEventListener('click', () => changeCalendarMonth(-1));
     DOM.nextMonth?.addEventListener('click', () => changeCalendarMonth(1));
     
@@ -351,13 +350,12 @@ function renderEmployeeList() {
 function updateCalendarContext() {
     let start;
     if (AppState.selection.startDate) {
-        // Garante a data correta adicionando o horário para evitar fuso horário voltando dia
+        // Ajuste de fuso para não voltar o dia
         start = new Date(AppState.selection.startDate + 'T12:00:00');
     } else {
         start = new Date();
     }
 
-    // FORÇA O CALENDÁRIO A SER IGUAL À DATA DE INÍCIO (Sincronia 1: Input -> Calendário)
     AppState.ui.calendarMonth = start.getMonth();
     AppState.ui.calendarYear = start.getFullYear();
     
@@ -365,7 +363,6 @@ function updateCalendarContext() {
 }
 
 function changeCalendarMonth(delta) {
-    // 1. Muda o mês do calendário visual
     AppState.ui.calendarMonth += delta;
     if (AppState.ui.calendarMonth > 11) {
         AppState.ui.calendarMonth = 0;
@@ -375,16 +372,12 @@ function changeCalendarMonth(delta) {
         AppState.ui.calendarYear--;
     }
 
-    // 2. FORÇA OS INPUTS A SEREM IGUAIS AO NOVO MÊS (Sincronia 2: Calendário -> Input)
     const year = AppState.ui.calendarYear;
-    const month = AppState.ui.calendarMonth; // 0-11
+    const month = AppState.ui.calendarMonth;
 
-    // Primeiro dia do mês novo
     const firstDay = 1;
-    // Último dia do mês novo
     const lastDay = new Date(year, month + 1, 0).getDate();
 
-    // Formata YYYY-MM-DD
     const strMonth = String(month + 1).padStart(2, '0');
     const strFirst = String(firstDay).padStart(2, '0');
     const strLast = String(lastDay).padStart(2, '0');
@@ -392,11 +385,9 @@ function changeCalendarMonth(delta) {
     const newStart = `${year}-${strMonth}-${strFirst}`;
     const newEnd = `${year}-${strMonth}-${strLast}`;
 
-    // Atualiza o DOM (Inputs)
     if(DOM.startDate) DOM.startDate.value = newStart;
     if(DOM.endDate) DOM.endDate.value = newEnd;
 
-    // Atualiza o Estado
     AppState.selection.startDate = newStart;
     AppState.selection.endDate = newEnd;
 
@@ -517,17 +508,22 @@ function updateReceiptPreview() {
     const absenceList = getFormattedList(AppState.selection.absences);
     const certList = getFormattedList(AppState.selection.certificates);
 
+    // --- CÁLCULOS PROPORCIONAIS ---
+    // Total de dias úteis no período selecionado (já exclui fds e feriados)
+    const totalWorkingDaysInPeriod = calculations.effectiveDays + calculations.absenceCount + calculations.certificateCount;
+
     let totalValue = 0;
     let descriptionText = '';
     let detailsHtml = '';
 
     if (type === 'valeTransporte') {
         DOM['receipt-title'].textContent = "Recibo de Vale Transporte";
-        const totalBusinessDays = calculations.effectiveDays + calculations.absenceCount + calculations.certificateCount; 
-        const prevMonthAbsences = AppState.selection.absences.size; 
         
-        const effectiveDaysForVT = totalBusinessDays - prevMonthAbsences;
-        totalValue = effectiveDaysForVT * RECEIPT_CONFIG.dailyValue;
+        // VT paga o proporcional aos dias que trabalhou (menos faltas). Atestados não descontam (então pagam).
+        // Lógica: Dias Úteis Totais - Faltas.
+        const payingDaysVT = totalWorkingDaysInPeriod - calculations.absenceCount;
+        
+        totalValue = payingDaysVT * RECEIPT_CONFIG.dailyValue;
         if(totalValue < 0) totalValue = 0; 
 
         descriptionText = "REFERENTE AO VALE TRANSPORTE";
@@ -540,16 +536,22 @@ function updateReceiptPreview() {
         detailsHtml = `
             ${periodString}
             <strong>Valor Diário:</strong> ${formatCurrency(RECEIPT_CONFIG.dailyValue)}<br>
-            <strong>Dias Úteis no Período:</strong> ${totalBusinessDays}<br>
+            <strong>Dias Úteis no Período:</strong> ${totalWorkingDaysInPeriod}<br>
             ${discountDetails}
         `;
     } 
     else if (type === 'salarioEstagiario') {
         DOM['receipt-title'].textContent = "Recibo Bolsa Estágio";
         descriptionText = `REFERENTE À BOLSA ESTÁGIO (${AppState.selection.internPeriod === 'matutino' ? 'Matutino' : 'Vespertino'})`;
-        const dailyAllowance = RECEIPT_CONFIG.monthlyAllowance / 30;
-        const discount = calculations.absenceCount * dailyAllowance;
-        totalValue = RECEIPT_CONFIG.monthlyAllowance - discount;
+        
+        // CÁLCULO PROPORCIONAL AO PERÍODO
+        // Base: Valor Mensal / 30 = Valor Diário
+        // Pagamento: Valor Diário * Dias Úteis a Pagar (Totais - Faltas)
+        // (Ignora sábados e domingos pois 'totalWorkingDaysInPeriod' já os ignora)
+        const dailyRate = RECEIPT_CONFIG.monthlyAllowance / 30;
+        const payingDaysIntern = totalWorkingDaysInPeriod - calculations.absenceCount;
+        
+        totalValue = payingDaysIntern * dailyRate;
         if(totalValue < 0) totalValue = 0;
 
         let details = '';
@@ -559,7 +561,8 @@ function updateReceiptPreview() {
 
         detailsHtml = `
             ${periodString}
-            <strong>Valor Mensal:</strong> ${formatCurrency(RECEIPT_CONFIG.monthlyAllowance)}<br>
+            <strong>Valor Mensal Base:</strong> ${formatCurrency(RECEIPT_CONFIG.monthlyAllowance)}<br>
+            <strong>Dias Pagos (Proporcional):</strong> ${payingDaysIntern}<br>
             ${details}
         `;
     }
@@ -607,9 +610,12 @@ async function handleAddEmployee() {
             nome: capitalizeWords(nome), 
             cpf: formattedCpf 
         });
-        showModal("Sucesso", "Funcionária adicionada.");
+        showModal("Sucesso", "Funcionária adicionada com sucesso!");
+        
         DOM.newEmployeeName.value = '';
         DOM.newEmployeeCpf.value = '';
+        DOM.newEmployeeName.focus(); // Foco rápido para o próximo cadastro
+
     } catch (e) {
         console.error(e);
         if (e.code === 'permission-denied') showModal("Sem Permissão", "Você precisa estar logado para salvar.");
