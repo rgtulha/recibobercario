@@ -496,18 +496,23 @@ function updateReceiptPreview() {
         DOM['receipt-title'].textContent = "Recibo de Vale Transporte";
         const totalBusinessDays = calculations.effectiveDays + calculations.absenceCount + calculations.certificateCount; 
         const prevMonthAbsences = AppState.selection.absences.size; 
-        const prevMonthCerts = AppState.selection.certificates.size;
-        const effectiveDaysForVT = totalBusinessDays - (prevMonthAbsences + prevMonthCerts);
+        
+        // CORREÇÃO: Não subtrai os atestados do cálculo financeiro
+        const effectiveDaysForVT = totalBusinessDays - prevMonthAbsences;
+        
         totalValue = effectiveDaysForVT * RECEIPT_CONFIG.dailyValue;
         if(totalValue < 0) totalValue = 0; 
 
         descriptionText = "REFERENTE AO VALE TRANSPORTE";
         
-        // Monta o HTML das linhas de desconto detalhado
+        // Monta o HTML: Atestados aparecem sem o rótulo "Descontos"
         let discountDetails = '';
         if (absenceList) discountDetails += `<div class="text-red-600">Descontos (Faltas): ${absenceList}</div>`;
-        if (certList) discountDetails += `<div class="text-green-700">Descontos (Atestados): ${certList}</div>`;
-        if (!absenceList && !certList) discountDetails = '<div class="text-stone-500 text-xs">Sem descontos</div>';
+        
+        // CORREÇÃO: Atestados apenas listados, com cor neutra
+        if (certList) discountDetails += `<div class="text-stone-600">Atestados: ${certList}</div>`;
+        
+        if (!absenceList && !certList) discountDetails = '<div class="text-stone-500 text-xs">Sem descontos ou atestados</div>';
 
         detailsHtml = `
             ${periodString}
@@ -524,12 +529,18 @@ function updateReceiptPreview() {
         totalValue = RECEIPT_CONFIG.monthlyAllowance - discount;
         if(totalValue < 0) totalValue = 0;
 
-        let discountLine = absenceList ? `<span class="text-red-600">Faltas descontadas: ${absenceList}</span>` : 'Sem faltas';
+        let details = '';
+        if (absenceList) details += `<div class="text-red-600">Faltas descontadas: ${absenceList}</div>`;
+        
+        // CORREÇÃO: Adicionada a listagem de atestados para Estagiário
+        if (certList) details += `<div class="text-stone-600">Atestados: ${certList}</div>`;
+        
+        if (!absenceList && !certList) details = '<div class="text-stone-500 text-xs">Sem faltas ou atestados</div>';
 
         detailsHtml = `
             ${periodString}
             <strong>Valor Mensal:</strong> ${formatCurrency(RECEIPT_CONFIG.monthlyAllowance)}<br>
-            ${discountLine}
+            ${details}
         `;
     }
     else if (type === 'bonificacao') {
