@@ -77,7 +77,7 @@ function cacheDOM() {
         'receipt-period-info', 'receipt-daily-value', 'receipt-holidays-info',
         'receipt-total-words-label', 'receipt-total-words', 'employee-signature-name', 'receipt-description',
         'newReceiptButton', 
-        'receipt-observation-container', 'receipt-observation-text' // Adicionados para Observação
+        'receipt-observation-container', 'receipt-observation-text'
     ];
 
     ids.forEach(id => {
@@ -279,7 +279,7 @@ function updateCalendarContext() {
 
 function changeCalendarMonth(delta) {
     AppState.ui.calendarMonth += delta;
-    if (AppState.ui.calendarMonth > 11) { Appstate.ui.calendarMonth = 0; AppState.ui.calendarYear++; }
+    if (AppState.ui.calendarMonth > 11) { AppState.ui.calendarMonth = 0; AppState.ui.calendarYear++; }
     else if (AppState.ui.calendarMonth < 0) { AppState.ui.calendarMonth = 11; AppState.ui.calendarYear--; }
     const year = AppState.ui.calendarYear;
     const month = AppState.ui.calendarMonth;
@@ -361,23 +361,46 @@ function updateReceiptPreview() {
     let descriptionText = '';
     let detailsHtml = '';
 
-    // LÓGICA DE VISIBILIDADE DO QUADRO DE OBSERVAÇÃO
     if (type === 'salarioEstagiario') {
         DOM['receipt-observation-container']?.classList.remove('hidden');
         DOM['receipt-observation-text'].textContent = "Nos termos da Lei nº 11.788/2008 (Lei do Estágio), o presente estágio possui caráter exclusivamente educativo, não configurando vínculo empregatício de qualquer natureza, desde que observados os requisitos legais, não sendo devidos encargos trabalhistas e previdenciários típicos da relação de emprego.";
         
         DOM['receipt-title'].textContent = "Recibo Bolsa Estágio";
         descriptionText = `REFERENTE À BOLSA ESTÁGIO (${AppState.selection.internPeriod === 'matutino' ? 'Matutino' : 'Vespertino'})`;
+        
+        // --- NOVO CÁLCULO PROPORCIONAL: CONTA DIAS CORRIDOS ---
+        const sDate = new Date(start + 'T12:00:00');
+        const eDate = new Date(end + 'T12:00:00');
+        
+        // Conta o total de dias corridos entre as duas datas (inclui sábados, domingos e feriados)
+        const totalCalendarDays = Math.round((eDate - sDate) / (1000 * 60 * 60 * 24)) + 1;
+        
+        // Conta quantas faltas marcadas estão dentro do período selecionado
+        const absencesInPeriodCount = Array.from(AppState.selection.absences).filter(dtStr => {
+            const dt = new Date(dtStr + 'T12:00:00');
+            return dt >= sDate && dt <= eDate;
+        }).length;
+
+        // Valor da diária = 1100 / 30
         const dailyAllowance = RECEIPT_CONFIG.monthlyAllowance / 30;
-        const discount = calculations.absenceCount * dailyAllowance;
-        totalValue = RECEIPT_CONFIG.monthlyAllowance - discount;
+        
+        // Dias a pagar = Dias corridos totais no período - Faltas
+        const payingDaysIntern = totalCalendarDays - absencesInPeriodCount;
+        
+        // Valor total final
+        totalValue = payingDaysIntern * dailyAllowance;
+        if(totalValue < 0) totalValue = 0;
 
         let details = absenceList ? `<div class="text-red-600">Faltas descontadas: ${absenceList}</div>` : 'Sem faltas';
         if (certList) details += `<div class="text-stone-600">Atestados: ${certList}</div>`;
-        detailsHtml = `${periodString}<strong>Valor Mensal Base:</strong> ${formatCurrency(RECEIPT_CONFIG.monthlyAllowance)}<br>${details}`;
+        
+        detailsHtml = `
+            ${periodString}
+            <strong>Valor Mensal Base:</strong> ${formatCurrency(RECEIPT_CONFIG.monthlyAllowance)}<br>
+            ${details}
+        `;
     } 
     else {
-        // Esconde o quadro para outros tipos de recibo
         DOM['receipt-observation-container']?.classList.add('hidden');
         
         if (type === 'valeTransporte') {
