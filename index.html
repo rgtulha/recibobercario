@@ -323,7 +323,7 @@
                         <p id="employee-cpf" class="text-lg text-stone-800"></p>
                     </div>
                     
-                    <div class="bg-stone-50 p-6 rounded-lg border border-stone-200">
+                   <div class="bg-stone-50 p-6 rounded-lg border border-stone-200">
                         <p class="text-sm text-stone-500 mb-2">Correspondente a:</p>
                         <p id="receipt-description" class="text-base text-stone-700 mb-4">REFERENTE AO VALE TRANSPORTE</p>
                         
@@ -332,7 +332,12 @@
                             <p id="receipt-daily-value"></p>
                             <div id="receipt-holidays-info" class="text-red-600 text-xs mt-2"></div>
                         </div>
-                        
+
+                        <div id="receipt-observation-container" class="hidden mt-4 p-4 border border-stone-300 bg-stone-100 rounded-lg">
+                            <h4 class="text-xs font-bold text-stone-800 mb-1 uppercase tracking-wider">Observação</h4>
+                            <p id="receipt-observation-text" class="text-xs text-stone-600 leading-relaxed italic text-justify"></p>
+                        </div>
+                         
                         <p class="text-lg text-stone-800 font-semibold mt-4 pt-4 border-t border-stone-200">
                             <span id="receipt-total-words-label">Quantia por extenso: </span><span id="receipt-total-words" class="font-normal"></span>
                         </p>
@@ -388,6 +393,7 @@
 
 </body>
 </html>
+
 
 
 
