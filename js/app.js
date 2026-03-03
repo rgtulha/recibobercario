@@ -368,26 +368,33 @@ function updateReceiptPreview() {
         DOM['receipt-title'].textContent = "Recibo Bolsa Estágio";
         descriptionText = `REFERENTE À BOLSA ESTÁGIO (${AppState.selection.internPeriod === 'matutino' ? 'Matutino' : 'Vespertino'})`;
         
-        // --- NOVO CÁLCULO PROPORCIONAL: CONTA DIAS CORRIDOS ---
+        // --- CÁLCULO ESTAGIÁRIO: MÊS COMERCIAL VS PROPORCIONAL ---
         const sDate = new Date(start + 'T12:00:00');
         const eDate = new Date(end + 'T12:00:00');
         
-        // Conta o total de dias corridos entre as duas datas (inclui sábados, domingos e feriados)
-        const totalCalendarDays = Math.round((eDate - sDate) / (1000 * 60 * 60 * 24)) + 1;
+        // Verifica se selecionou o mês cheio (Dia 1 até o último dia do mês)
+        const isFirstDay = sDate.getDate() === 1;
+        const lastDayOfStartMonth = new Date(sDate.getFullYear(), sDate.getMonth() + 1, 0).getDate();
+        const isLastDay = (eDate.getDate() === lastDayOfStartMonth) && (sDate.getMonth() === eDate.getMonth());
+
+        let baseDays = 0;
+        if (isFirstDay && isLastDay) {
+            // Se for o mês completo, considera 30 dias na base de cálculo (Regra Mês Comercial)
+            baseDays = 30;
+        } else {
+            // Se for quebrado, considera a quantidade exata de dias corridos
+            baseDays = Math.round((eDate - sDate) / (1000 * 60 * 60 * 24)) + 1;
+        }
         
-        // Conta quantas faltas marcadas estão dentro do período selecionado
+        // Faltas no período
         const absencesInPeriodCount = Array.from(AppState.selection.absences).filter(dtStr => {
             const dt = new Date(dtStr + 'T12:00:00');
             return dt >= sDate && dt <= eDate;
         }).length;
 
-        // Valor da diária = 1100 / 30
         const dailyAllowance = RECEIPT_CONFIG.monthlyAllowance / 30;
+        const payingDaysIntern = baseDays - absencesInPeriodCount;
         
-        // Dias a pagar = Dias corridos totais no período - Faltas
-        const payingDaysIntern = totalCalendarDays - absencesInPeriodCount;
-        
-        // Valor total final
         totalValue = payingDaysIntern * dailyAllowance;
         if(totalValue < 0) totalValue = 0;
 
