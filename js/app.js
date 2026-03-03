@@ -350,7 +350,6 @@ function renderEmployeeList() {
 function updateCalendarContext() {
     let start;
     if (AppState.selection.startDate) {
-        // Ajuste de fuso para não voltar o dia
         start = new Date(AppState.selection.startDate + 'T12:00:00');
     } else {
         start = new Date();
@@ -508,8 +507,6 @@ function updateReceiptPreview() {
     const absenceList = getFormattedList(AppState.selection.absences);
     const certList = getFormattedList(AppState.selection.certificates);
 
-    // --- CÁLCULOS PROPORCIONAIS ---
-    // Total de dias úteis no período selecionado (já exclui fds e feriados)
     const totalWorkingDaysInPeriod = calculations.effectiveDays + calculations.absenceCount + calculations.certificateCount;
 
     let totalValue = 0;
@@ -519,8 +516,7 @@ function updateReceiptPreview() {
     if (type === 'valeTransporte') {
         DOM['receipt-title'].textContent = "Recibo de Vale Transporte";
         
-        // VT paga o proporcional aos dias que trabalhou (menos faltas). Atestados não descontam (então pagam).
-        // Lógica: Dias Úteis Totais - Faltas.
+        // VT mantém o cálculo proporcional aos dias úteis do período
         const payingDaysVT = totalWorkingDaysInPeriod - calculations.absenceCount;
         
         totalValue = payingDaysVT * RECEIPT_CONFIG.dailyValue;
@@ -544,14 +540,11 @@ function updateReceiptPreview() {
         DOM['receipt-title'].textContent = "Recibo Bolsa Estágio";
         descriptionText = `REFERENTE À BOLSA ESTÁGIO (${AppState.selection.internPeriod === 'matutino' ? 'Matutino' : 'Vespertino'})`;
         
-        // CÁLCULO PROPORCIONAL AO PERÍODO
-        // Base: Valor Mensal / 30 = Valor Diário
-        // Pagamento: Valor Diário * Dias Úteis a Pagar (Totais - Faltas)
-        // (Ignora sábados e domingos pois 'totalWorkingDaysInPeriod' já os ignora)
-        const dailyRate = RECEIPT_CONFIG.monthlyAllowance / 30;
-        const payingDaysIntern = totalWorkingDaysInPeriod - calculations.absenceCount;
-        
-        totalValue = payingDaysIntern * dailyRate;
+        // NOVA LÓGICA: Mensal fixo de R$ 1100,00 independente dos dias do mês.
+        // Desconta apenas (Faltas * (1100 / 30)). Atestados não descontam. Feriados não afetam.
+        const dailyAllowance = RECEIPT_CONFIG.monthlyAllowance / 30;
+        const discount = calculations.absenceCount * dailyAllowance;
+        totalValue = RECEIPT_CONFIG.monthlyAllowance - discount;
         if(totalValue < 0) totalValue = 0;
 
         let details = '';
@@ -559,10 +552,10 @@ function updateReceiptPreview() {
         if (certList) details += `<div class="text-stone-600">Atestados: ${certList}</div>`;
         if (!absenceList && !certList) details = '<div class="text-stone-500 text-xs">Sem faltas ou atestados</div>';
 
+        // Removido o "Dias Pagos (Proporcional)"
         detailsHtml = `
             ${periodString}
             <strong>Valor Mensal Base:</strong> ${formatCurrency(RECEIPT_CONFIG.monthlyAllowance)}<br>
-            <strong>Dias Pagos (Proporcional):</strong> ${payingDaysIntern}<br>
             ${details}
         `;
     }
