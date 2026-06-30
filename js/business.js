@@ -9,9 +9,10 @@ export const RECEIPT_CONFIG = {
     cnpj: "32.741.557/0001-70",
     description: "REFERENTE AO VALE TRANSPORTE",
     location: "Goiânia",
-    fixedTransportValue: 180.00, // <-- Adicionado o valor fixo de R$ 180
+    dailyValue: 8.60,          
     fixedBonusAmount: 200.00, 
-    monthlyAllowance: 1200.00    // <-- Alterado de 1100 para 1200
+    monthlyAllowance: 1100.00,
+    vtMonthlyFixed: 180.00
 };
 
 /**
