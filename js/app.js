@@ -420,14 +420,18 @@ function updateReceiptPreview() {
         DOM['receipt-observation-text'].textContent = "Nos termos da Lei nº 7.418/85 e do Decreto nº 95.247/87 o benefício de Vale-Transporte destina-se exclusivamente ao custeio das despesas com meu deslocamento no trajeto residência–trabalho–residência, mediante utilização de transporte público coletivo, não possuindo natureza salarial nem podendo ser utilizado para finalidade diversa da prevista em lei.";
         
         DOM['receipt-title'].textContent = "Recibo de Vale Transporte";
-        const payingDaysVT = totalWorkingDaysInPeriod - calculations.absenceCount;
-        totalValue = payingDaysVT * RECEIPT_CONFIG.dailyValue;
+        
+        // --- NOVA LÓGICA DO VALE TRANSPORTE (FIXO) ---
+        totalValue = RECEIPT_CONFIG.fixedTransportValue; 
+        // ---------------------------------------------
+        
         descriptionText = "REFERENTE AO VALE TRANSPORTE";
         
         let discount = absenceList ? `<div class="text-red-600">Descontos (Faltas): ${absenceList}</div>` : '';
         if (certList) discount += `<div class="text-stone-600">Atestados: ${certList}</div>`;
         
-        detailsHtml = `${periodString}<strong>Valor Diário:</strong> ${formatCurrency(RECEIPT_CONFIG.dailyValue)}<br><strong>Dias Úteis no Período:</strong> ${totalWorkingDaysInPeriod}<br>${discount || 'Sem descontos ou atestados'}`;
+        // --- TEXTO ATUALIZADO PARA INFORMAR O VALOR FIXO ---
+        detailsHtml = `${periodString}<strong>Valor Fixo:</strong> ${formatCurrency(RECEIPT_CONFIG.fixedTransportValue)}<br><strong>Dias Úteis no Período:</strong> ${totalWorkingDaysInPeriod}<br>${discount || 'Sem descontos ou atestados'}`;
     }
     else if (type === 'bonificacao') {
         DOM['receipt-observation-text'].textContent = "Nos termos da Lei nº 11.788/2008 (Lei do Estágio), o presente estágio possui caráter exclusivamente educativo, não configurando vínculo empregatício de qualquer natureza, desde que observados os requisitos legais, não sendo devidos encargos trabalhistas e previdenciários típicos da relação de emprego.";
