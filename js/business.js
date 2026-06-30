@@ -11,7 +11,7 @@ export const RECEIPT_CONFIG = {
     location: "Goiânia",
     
     // --- ALTERAÇÕES AQUI ---
-    fixedTransportValue: 150.00, // <- Valor fixo do Vale Transporte (Altera para o valor real)
+    fixedTransportValue: 180.00, // <- Valor fixo do Vale Transporte (Altera para o valor real)
     monthlyAllowance: 1200.00,   // <- Bolsa de estagiário aumentada para 1200
     // -----------------------
     
