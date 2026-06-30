@@ -425,7 +425,7 @@ function updateReceiptPreview() {
         if (totalValue < 0) totalValue = 0;
         descriptionText = "REFERENTE AO VALE TRANSPORTE";
         
-        let discount = absenceList ? `<div class="text-red-600">Descontos (Faltas: ${absenceList}) - ${formatCurrency(vtDiscount)}</div>` : '';
+        let discount = absenceList ? `<div class="text-red-600">Descontos (Faltas: ${absenceList})</div>` : '';
         if (certList) discount += `<div class="text-stone-600">Atestados (sem desconto): ${certList}</div>`;
         
         detailsHtml = `${periodString}<strong>Valor Fixo Mensal:</strong> ${formatCurrency(RECEIPT_CONFIG.vtMonthlyFixed)}<br><strong>Valor por Falta:</strong> ${formatCurrency(RECEIPT_CONFIG.dailyValue)}<br>${discount || 'Sem descontos ou atestados'}`;
