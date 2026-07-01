@@ -11,7 +11,7 @@ export const RECEIPT_CONFIG = {
     location: "Goiânia",
     dailyValue: 8.60,          
     fixedBonusAmount: 200.00, 
-    monthlyAllowance: 1100.00,
+    monthlyAllowance: 1200.00,
     vtMonthlyFixed: 180.00
 };
 
