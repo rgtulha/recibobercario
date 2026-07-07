@@ -335,6 +335,11 @@ function renderCalendar() {
 function updateReceiptPreview() {
     if (!AppState.selection.employee) return;
     
+    // IMPORTANTE: Limpa o campo para garantir que não apareça "Valor por falta" do código antigo
+    if(DOM['receipt-daily-value']) {
+        DOM['receipt-daily-value'].innerHTML = ''; 
+    }
+    
     if(DOM['receipt-date-top']) DOM['receipt-date-top'].textContent = getCurrentDateFormatted();
     if(DOM['employee-name']) DOM['employee-name'].textContent = capitalizeWords(AppState.selection.employee.nome);
     if(DOM['employee-cpf']) DOM['employee-cpf'].textContent = AppState.selection.employee.cpf;
@@ -361,7 +366,6 @@ function updateReceiptPreview() {
     let descriptionText = '';
     let detailsHtml = '';
 
-    // Deixa o quadro de observação sempre visível
     DOM['receipt-observation-container']?.classList.remove('hidden');
 
     if (type === 'salarioEstagiario') {
@@ -420,15 +424,21 @@ function updateReceiptPreview() {
         DOM['receipt-observation-text'].textContent = "Nos termos da Lei nº 7.418/85 e do Decreto nº 95.247/87 o benefício de Vale-Transporte destina-se exclusivamente ao custeio das despesas com meu deslocamento no trajeto residência–trabalho–residência, mediante utilização de transporte público coletivo, não possuindo natureza salarial nem podendo ser utilizado para finalidade diversa da prevista em lei.";
         
         DOM['receipt-title'].textContent = "Recibo de Vale Transporte";
-        const vtDiscount = calculations.absenceCount * RECEIPT_CONFIG.dailyValue;
-        totalValue = RECEIPT_CONFIG.vtMonthlyFixed - vtDiscount;
-        if (totalValue < 0) totalValue = 0;
         descriptionText = "REFERENTE AO VALE TRANSPORTE";
         
-        let discount = absenceList ? `<div class="text-red-600">Descontos (Faltas: ${absenceList})</div>` : '';
-        if (certList) discount += `<div class="text-stone-600">Atestados (sem desconto): ${certList}</div>`;
+        // --- NOVA LÓGICA DO VALE TRANSPORTE CORRIGIDA ---
+        const baseValue = RECEIPT_CONFIG.vtMonthlyFixed; // Valor Fixo Integral R$ 180,00
         
-        detailsHtml = `${periodString}<strong>Valor Fixo Mensal:</strong> ${formatCurrency(RECEIPT_CONFIG.vtMonthlyFixed)}<br><strong>Valor por Falta:</strong> ${formatCurrency(RECEIPT_CONFIG.dailyValue)}<br>${discount || 'Sem descontos ou atestados'}`;
+        // Desconto = Quantidade de Faltas * R$ 8,60 (Feriados/fins de semana não entram, nem atestados)
+        const discountValue = calculations.absenceCount * RECEIPT_CONFIG.dailyValue; 
+        
+        totalValue = baseValue - discountValue;
+        if (totalValue < 0) totalValue = 0;
+        
+        let discountHtml = absenceList ? `<div class="text-red-600">Dias de faltas descontados: ${absenceList}</div>` : '';
+        if (certList) discountHtml += `<div class="text-stone-600">Atestados (Sem desconto): ${certList}</div>`;
+        
+        detailsHtml = `${periodString}<strong>Valor Fixo Integral:</strong> ${formatCurrency(baseValue)}<br><strong>Dias Úteis no Período:</strong> ${totalWorkingDaysInPeriod}<br>${discountHtml || 'Sem descontos ou atestados'}`;
     }
     else if (type === 'bonificacao') {
         DOM['receipt-observation-text'].textContent = "Nos termos da Lei nº 11.788/2008 (Lei do Estágio), o presente estágio possui caráter exclusivamente educativo, não configurando vínculo empregatício de qualquer natureza, desde que observados os requisitos legais, não sendo devidos encargos trabalhistas e previdenciários típicos da relação de emprego.";
